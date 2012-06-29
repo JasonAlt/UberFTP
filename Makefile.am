@@ -61,9 +61,7 @@ Sources= \
 uberftp_SOURCES=$(Sources)
 uberftp_LDFLAGS=@GLOBUS_LDFLAGS@
 uberftp_LDADD=@GLOBUS_PKG_LIBS@
-# This hack is in until I can figure out why globus_makefile_header in
-# 5.2.x does not return include/globus/<flavor>/
-uberftp_CFLAGS=@GLOBUS_CFLAGS@ @GLOBUS_INCLUDES@ -I@GLOBUS_LOCATION@/include/globus/@GLOBUS_FLAVOR_NAME@
+uberftp_CFLAGS=@GLOBUS_CFLAGS@ @GLOBUS_CPPFLAGS@
 bin_PROGRAMS=uberftp
 man_MANS=uberftp.1
 

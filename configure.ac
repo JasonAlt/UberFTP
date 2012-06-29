@@ -229,13 +229,8 @@ AC_CONFIG_FILES([Makefile])
 
 AC_SUBST(GLOBUS_CC)
 AC_SUBST(GLOBUS_CFLAGS)
-AC_SUBST(GLOBUS_INCLUDES)
+AC_SUBST(GLOBUS_CPPFLAGS)
 AC_SUBST(GLOBUS_PKG_LIBS)
 AC_SUBST(GLOBUS_LDFLAGS)
-
-# This hack is in until I can figure out why globus_makefile_header in 
-# 5.2.x does not return include/globus/<flavor>/
-AC_SUBST(GLOBUS_LOCATION)
-AC_SUBST(GLOBUS_FLAVOR_NAME)
 
 AC_OUTPUT
