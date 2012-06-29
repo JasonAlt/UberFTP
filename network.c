@@ -178,6 +178,7 @@ net_connect(nh_t ** nhp,  struct sockaddr_in * sin)
 
 			switch (errno)
 			{
+			case EADDRNOTAVAIL:
 			case EADDRINUSE:
 			case EACCES:
 				break;

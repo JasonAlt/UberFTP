@@ -22,6 +22,7 @@ Version 2.7 03/28/12
 	  class of service (used with HPSS installations).
 	- Fixed build against Globus 5.2.x
 	- Removed SETFAM, WIND, SITE BUFSIZE
+	- Fixed EADDRNOTAVAIL bug on SLES10 when using port ranges
 
 Version 2.6 8/5/10
 	- Fixed a segfault found on a UV10 running SLES11. The crash occurs
