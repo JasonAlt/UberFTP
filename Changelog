@@ -1,0 +1,331 @@
+Version 2.6 8/5/10
+	- Fixed a segfault found on a UV10 running SLES11. The crash occurs
+	  when the client tries to print out the server MOTD and the MOTD
+	  has '%' embedded in it.
+
+Version 2.5 9/08/09
+	- Removed warnings at connect when service does not support MLST
+	- Fixed directory listings on systems that do not support MLST
+	- Removed mlsx usage from the manpage
+	- No longer issue MLST/MLSD commands for parent directories unless
+	  a regular expression is encountered. This is a slight performance
+	  boost and a workaround for services that disallow access to parent
+	  directories.
+	- Fixed timestamps when listing in recursive or using regular
+	  expressions. Timestamps are now shown in your local timezone.
+	- Added check for src and dst URLs when using URL command line
+	  transfer syntax
+	- Fixed URL command line transfers when the destination is local
+	- Fixed typos in 'put' help message and 'Unknown commad'
+
+Version 2.4  4/17/09
+	- Fixed a segfault in the stage command
+
+Version 2.3  4/1/09
+	- Added support for GLOBUS_TCP_PORT_RANGE, GLOBUS_TCP_SOURCE_RANGE,
+	  UBERFTP_TCP_PORT_RANGE and UBERFTP_TCP_SOURCE_RANGE. The GLOBUS_*
+	  versions are there for backwards compatibility. The UBERFTP_*
+	  versions do the same things as their GLOBUS_* counterparts. The
+	  UBERFTP_* versions will override the GLOBUS_* versions if both
+	  are available.
+
+Version 2.2  1/6/09
+	- Fixed misspelling of argument
+	- Added '-a <auth>' command line argument which only gives a warning
+	  that it has been deprecated
+
+Version 2.1  11/12/08
+	- Fixed a bug where stdin was closed if local file wasn't opened
+	  successfully during transfers
+	- Fixed a build problem on OS X with the variable name 'wait'
+	- Alphabetized the help menu
+	- Added '?' command as an alias for help
+	- Added runique/sunique for unique filenaming during transfers
+	- directory listings can now be saved to a file
+	- Added cdup/lcdup commands
+	- Added 'glob' command and '-glob' commandline option to toggle 
+	  filename expansion
+	- Added '!' command to escape to a shell prompt
+	- Changed precision of reported transfer rates
+	- Moved the 'CHGRP' call to 'SITE CHGRP' since that is where NCSA's
+	  mss has it and that is where it fits under globus servers
+	- Comma can be used in addition to semi colons to delimit commands given
+	  on the command line.
+	- Fixed the misspelled word 'conneciton' in the manpage
+	- Fixed FTP syntax for pget and pput functions
+	- Fixed pget manpage entry for srcfile and destfile definitions
+	- Fixed command piping in put commands by not coping stderr into the
+	  resulting file
+	- Fixed wildcards in pipe commands
+	- Fixed 'put file directory'
+	- Fixed offset used in cat/lcat
+	- Changed 'quote setfam' & 'quote site setfam' to pass through to
+	  the server first and then handle the response accordingly
+	- Added polling when reading server responses to keep the client from
+	  heavily using the CPU during 'quote stage 60'
+	- Added --with-tcp-window to the configure script to allow the default
+	  TCP window to be set specific to the host system
+	- Added -with-blksize to the configure script to allow the default
+	  internal buffer size to be set for optimal performance on the host system
+	- Client will now truncate the local destination file if it exists
+	- Changed data channel protection level to 'clear' to greatly improve
+	  performance by default
+	- Fix for NAME_MAX on AIX, now use pathconf()
+	- Fix for lcd -
+	- Fix for 'ALLO 0' on some 32 bit platforms
+	- Fixed directory listings when using 'order' settings. The target
+	  directory no longer appears in the output. './' is no longer
+	  prefixed to 'ls' output. Target directories are now expanded in
+	  the listing output.
+	- Fixed default type when MLSD/MLST is not available
+	- Destination file removed after transfer failure unless using
+	  pget or pput
+	- Adjusted the list output to be a bit more readable
+	- rm and ls will continue after an error is encounted
+	- UberFTP will attempt to stage a file before retrieval even if wait
+	  is disabled. A more detailed message is returned to the user if the
+	  file is not on disk.
+	- recursive or regular expression transfers which transfer multiple
+	  files will continue after errors are encountered until the current
+	  command has completed
+
+
+
+Version 2.0  8/06/08
+	- Complete re write to fix some outstanding issues
+	- No longer dependent upon globus ftp control libraries, only requires
+	  the globus_gssapi_gsi library.
+	- Added retry. Set this to the number of times you would like to retry
+	  commands that fail with transient failures.
+	- remove bget/bput and added 'retry' so all operations can recover
+	- Added reconnect on connection timeout
+	- Removed MSS authentication since it will be removed soon from NCSA's
+	  mass storage system.
+	- Removed the -a option to open. Now the authentication mechanism is
+	  implied by the use a password
+	- Now using MSLT/MLSD for recursive or globbing. The client will not
+	  perform these operations for systems that do not support it.
+	- cat, mkdir, rmdir, chmod, rm can take multiple targets
+	- Added support for command piping the local target to get/put
+	- Added chgrp
+	- GSI code will now reuse the previously retrieved credential instead of
+	  re retreiving it.
+	- Checksums are now computed automatically after transfers if requested
+	- Expanded command line options
+	- Mkdir will not fail when the directory already exists if 
+	  MLSx is supported
+	- put -r will not fail when creating directories that already exist
+	  if MLSx is supported
+	- Added the 'family' command for setting tape family with FTP
+	  services that support it
+	- Added the 'resume' command. Give it the last attempted file transfer
+	  or directory created during a failed recursive transfer and it will
+	  skip to that target when you re run the recursive transfer
+	- Added cksum which will compare local and remote CRC's
+	- Added stage/lstage commands which take multiple objects. This also
+	  suports recursion and regular expressions.
+	- Control Channel keepalive is no optional and disabled by default
+	- Added Data Channel Authentication and the command "dcau"
+	- Added data channel encryption and the command "prot"
+	- Added pbsz for changing the protection buffer size which is the maximum
+	  encrypted message size on the data channel
+	- Added a reconnect feature. If your connection has timed out or is dropped,
+	  the client will reconnect you and preform your operation.
+	- wait is now built into the client. This causes the client to attempt
+	  to stage a file before downloading it.
+	- Added size/lsize to give you the size of remote objects
+	- Added ~ path expansion
+	- Added 'cd -' capabilities
+
+Version 1.27 02/8/08
+	- Fixed bug were passive addresses were interpretted as IPv6 addresses
+	- Flush out error messages so that the appear inline
+
+Version 1.26 01/10/08
+	- Rework of recursive operations to fix some failures
+	- Destination directory must exist when transferring files
+
+Version 1.25 07/24/07
+	- 'quote stage' is now handled within the client to avoid firewall timeouts.
+	- 'quote sum' no longer uses firewall timeouts
+
+Version 1.24 04/27/07
+	- Fixed parsing for -c option
+	- Fix in filelist.h, filelist.c and ftpSession.h to fix build 
+	  with xlc on AIX.
+
+Version 1.23 02/16/07
+	- Fixes for OSX including how optind is reset and dealing with
+	  return values from strchr_r().
+
+Version 1.22 10/23/06
+	- Username/password authentication added to the commandline and the 
+	  open/lopen commands. 
+	- Username added to GSI authentication for advanced users that have 
+	  multiple accounts that map to the same public key. 
+	- Enhanced help menus with much more detail on each command. 
+	- New keepalive issue added to data transfers to fix hanging issues related
+	  to some firewalls. The client will now send 'NOP' to the server if it 
+	  suspects that a problem has occurred. This fix is related (and in some 
+	  situations requires the fix for) globus bug 4735. 
+	- Added timeouts to fix server crash related hangs during data transfers. 
+	- Fixed hangs caused by bad third-party transfers. If a problem occurs with
+	  one service involved in the transfer, the connections are closed to 
+	  prevent the client from haning. 
+	- Enhanced error reporting and handling. Fixed exit values for various 
+	  commands. Expanded the GSI related error messages to include more details.
+	  Fixed the mput/mget return value for no match. Solved several memory 
+	  leaks related to globus error objects and globus printable strings. 
+	- Added URL style command line transfers. So now you can specify source 
+	  and destination from the command line using one of the prefixes 
+	  gsiftp://, file: or mss://. Or you can put source/destinations pairs in 
+	  a file and use the -f option. 
+	- Added the 'bugs' command to interactive mode which prints a short message
+	  about who to send bugs and feature requests to. 
+	- Added -m mode command line option to set the transfer mode to 'S' streams
+	  mode or 'E' extended block mode. 
+	- Added -versions command line option to print the version of all related 
+	  globus libraries. 
+	- Added debug information to directory listings for problem debugging. 
+	- Rewrote the directory parsing to work with the Fermilab server. 
+	- Added the recursive feature to mput and mget. These functions also allow
+	  for multiple sources to be listed similar to the bput and bget functions. 
+	- Rewrote lrm when not connected to a local service so that error messages
+	  are printed instead of ignored. 
+	- Added the 'order' interactive command to change the order of directory 
+	  listings to to name, size or type. 
+	- Added debug levels with differing amounts of output. This can be set from
+	  the command line using the -D option or from the debug interactive 
+	  command. 
+ 
+Version 1.21 08/29/06 
+	- It fixes a couple bugs in 1.20 including the lls bug on mercury (in 
+	  which you see no listing) and the lcd bug (which causes a core dump).  
+
+Version 1.20 07/21/06
+	- Improved regular expressions. Version 1.19 only handled expressions in 
+	  the last portion of the path. Version 1.20 allows the expression to be 
+	  in any, or all, portions of the path. Added recursive listing and now 
+	  you can use quotes and backslashes to work with file names with spaces.  
+
+Version 1.19 03/15/06  
+	- Includes a new recursive feature available with the rm, lrm, chmod, 
+	  lchmod, get and put commands. Each of these commands accept the '-r' 
+	  option to activate recursive mode. In recursive mode, get and put take 
+	  directories as the source and destination rather than regular files. 
+	  Be careful when using recursive in third-party transfers since a simple 
+	  mistake such as incorrect permissions can cause the transfers to hang. 
+	  This is a known deficiency in the FTP protocol which is exaggerated by 
+	  the recursive feature. 
+	- Fixes a hanging bug associated with pattern matching that was found 
+	  when using rmdir and mput.  
+
+Version 1.18 10/14/05
+	- Fixed a segfault from improper use of vsnprintf() in SendCmd().  
+
+Version 1.17 09/21/05
+	- Added 'bye' as an alias to 'quit'.
+	- It now handles bad PASV/SPAS responses which contain zero valid addresses.
+	- Fixed the 'fixed-sized' buffers which truncated long commands and 
+	- long pathnames.  
+
+Version 1.16 08/29/05
+	- Added support for third-party striping. Since the client is streams mode 
+	  by default, you need to switch to extended block mode ('mode e' or 
+	  'parallel x'). If the transfer has more than one stripe, a message is 
+	  printed informing you of how many stripes are being used.
+	- ALLO is no longer sent on partial transfers.
+	- Removed server messages during transfers and replaced it with a 
+	  completion message that gives the time elapsed, data transferred and rate.
+	- Fixed SIZE usage to handle non existent files.
+	- The local file is truncated when using 'get' to fix the 'zero-length 
+	  transfer not overwriting the local file' bug.  
+
+Version 1.15 08/10/05
+	- Fixed the exit values for batch mode. If an error occurs, the client 
+	  exits immediately with a value of 1. Otherwise it exits with a value of 
+	  0 once all commands have finished executing. Interactive mode always 
+	  exits with a value of 0.  
+
+Version 1.14 08/5/05
+	- rm/rmdir/lrm/lrmdir now handle regular expressions. These commands do not
+	  accept the unix command flags ie. '-f', '-r'. Be careful when using rm 
+	  because it uses DELE which will delete files AND directories.  
+
+Version 1.13 03/25/05
+	- Adds rename/lrename. 
+	- A new manpage is included. 
+	- Removed '-?' from the help menu because it doesn't work under tcsh. 
+	- Added a new environment variable UBERFTP_ACTIVE_MODE. If set, it 
+	  defaults to ACTIVE rather than passive mode which is essential for good 
+	  performance when using NCSA's mass storage system. 
+	- 'passive' no longer toggles passive/active modes, instead an 'active' 
+	  command was added and each command sets (not toggles) the corresponding 
+	  mode. 
+	- 'OPT RETR PARALLELISM' has been changed to 'OPTS RETR Parallelism' to 
+	  work around a case sensitiviy bug in the Globus's beta striping gridftp 
+	  server.  
+
+Version 1.12 02/22/05
+	- Removes the 0 length local copy of a file when the user receives 
+	  permission denied (if uberftp created the local copy).  
+
+Version 1.11 09/9/04
+	- Accepts code 125 when opening a data connection.  
+
+Version 1.10 08/25/04
+	- Fixes the strtoll() build problem on Tru64.  
+
+Version 1.9 07/27/04
+	- Adds a fix for tcpbuf.  
+
+Version 1.8 07/26/04
+	- 'tcpbuf <int>' will set the TCP buffer size.  
+
+Version 1.7 06/25/04
+	- ALLO support was added. 
+	- username/password was removed. 
+	- The -H option on the commandline or to open/lopen is optional so users 
+	  can now specify 'uberftp mss.ncsa.uiuc.edu' which connects to mass 
+	  storage using GSI on port 2811. 
+	- 15 minute timeouts form the Globus gridftp server are now handled 
+	  correctly.  
+
+Version 1.6 05/6/04
+	- UberFtp now defaults to passive streams mode to avoid firewall issues. If
+	  you issue 'parallel x' where x >= 2, or perform third-party transfers, 
+	  the client will use an active data connection. It will also failover to 
+	  active if the service denies passive mode. This change will also be more 
+	  efficient then the previous versions where it used extended block mode on
+	  a single data channel.  
+
+Version 1.5 04/22/04
+	- Fixes build problems on AIX 5.x.  
+
+Version 1.4 04/1/04
+	- Fixes a build problem with Globus Toolkit 3.2 Beta.  
+
+Version 1.3 12/8/03
+	- Includes improved handling of directory listing commands. Now all 
+	  options given to 'ls' are passed to the remote service. Note: this is 
+	  not supported by all FTP implementations and this change only affects 
+	  those implementations that can handle this feature.  
+
+Version 1.2 12/8/03
+	- Fixes a build problem on Solaris and a typo in a help message.  
+
+Version 1.1 11/17/03
+	- Fixes pget/pput offsets, removes '\r' from LIST output, removed pthr 
+	  requirement, fixed crash caused when remote server sends empty responses.
+
+Version 1.0 11/11/03
+	- Version 1.0 is available for download.  
+
+Version ALPHA_8_7 10/1/03
+	- Added a rate message after completed transfers
+	- Fix for the put bug 
+	- Added the new command blksize which allows you to set the buffer and 
+	  block size used in data transfers.  
+
+Version ALPHA_8_6 09/24/03
+	- Head on over to the downloads section.  

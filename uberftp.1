@@ -1,0 +1,804 @@
+.\" @(#)uberftp.1c 1.34 90/02/15 SMI; from UCB 4.3
+.TH UBERFTP 1C "16 May 2008"
+.SH NAME
+uberftp \- GridFTP-enabled client
+.SH SYNOPSIS
+.B uberftp
+.RB [options]
+.RB [host
+.RB options]
+.RB [\fIhost\fR]
+
+.B uberftp
+.RB [options]
+.RB [host
+.RB options]
+.RB host
+\*(lq\fIcmd\fR\*(rq
+
+.B uberftp
+.RB [options]
+\fIsrcurl\fR
+\fIdsturl\fR
+
+.B uberftp
+.RB [options]
+.RB -f 
+\fIurlfile\fR
+
+.B uberftp
+.RB [options]
+.RB -cmd
+\fIurl\fR
+
+.SH DESCRIPTION
+.IX "uberftp command"  ""  "\fLuberftp\fP \(em file transfer"
+.IX GridFTP grid files transfer
+.IX "file transfer protocol"  "uberftp command"  ""  "\fLuberftp\fP command"
+.LP
+.B uberftp 
+is a GridFTP-enabled client that supports both interactive use and 
+FTP commands on the \fBuberftp\fR command line to transfer files between two 
+computers. It is intended for use with computers that have a GridFTP 
+server installed. \fBUberftp\fR supports GSI authentication, parallel data
+channels and striping. For more information about GridFTP, see the GridFTP
+URL in the "SEE ALSO" section below.
+
+Only the first usage shown above will create an interactive session. If
+\fIhost\fR is specified,
+.B uberftp
+immediately attempts to establish a connection to the
+.SM GridFTP
+server on 
+\fIhost\fR, 
+enters its command interpreter and awaits commands from the user. If
+\fIhost\fR is not specified,
+.B uberftp
+immediately drops into the command interpreter without connecting to any
+.SM GridFTP
+server.
+
+The second usage option denotes a non interactive session in which
+\*(lq\fIcmd\fR\*(rq
+is a series of one or more commands as described in the 
+.B COMMANDS
+section below to run once the control connection is established. These 
+commands are run exactly as if they had been entered from the interactive
+prompt. This list must be enclosed in quotes. Multiple commands
+are semicolon or comma delimited. uberftp will execute these commands and
+then exit.
+.B Uberftp
+will exit upon the first error encountered.
+
+The third and forth usage statements use the URL style format for specifying
+the source and destination for the files to transfer. The third usage statement
+places these URLs on the command line. The forth usage allows the user to 
+specify multiple URL pairs in a separate file for
+.B Uberftp
+to transfer one at a time. The supported URL syntaxes are gsiftp://[user@]host[:port]/file,
+ftp://[user[:pass]@]host[:port]/file and file://path.
+
+The fifth usage statement allows for commands that take pathnames to accept
+URLs instead. The allowable commands are listed in the
+.B -cmds
+section below.
+
+.SH HOST OPTIONS
+.TP
+.B \-P \fIport\fR
+Connect to \fIport\fR instead of the default. The default for GSI 
+authentication is 2811. The default for password authentication
+is 21.
+.TP
+.B \-u \fIuser\fR
+Connect as \fIuser\fR. This is useful for both password and GSI
+authentication mechanisms.
+.TP
+.B \-p \fIpass\fR
+Use \fIpass\fR when authenticating. If \fIpass\fR equals X, UberFTP will
+prompt for the password with character echoing turned off.
+
+
+.SH OPTIONS
+.TP
+.B \-active
+Use ACTIVE mode for data transfers.
+.TP
+.B \-ascii
+Use ASCII mode for data transfers.
+.TP
+.B \-binary
+Use BINARY mode for data transfers.
+.TP
+.B \-blksize \fIn\fR
+Set the internal buffer size to \fIn\fR.
+.TP
+.B \-cksum [\fIon\fR|\fIoff\fR]
+Enable/Disable CRC checks after file transfers.
+.TP
+.B \-debug \fIn\fR
+Set the debug level to \fIn\fR.
+.TP
+.B \-family \fIname\fR
+Set the remote storage family to \fIname\fR.
+.TP
+.B \-glob [\fIon\fR|\fIoff\fR]
+Enable/Disable filename expansion.
+.TP
+.B \-hash
+Enable printing of hash marks during transfers.
+.TP
+.B \-keepalive \fIn\fR
+Send control channel keepalive messages every \fIn\fR seconds
+during data transfers.
+.TP
+.B \-mode [\fIE\fR|\fIS\fR]
+Switch the transfer mode to extended block (\fIE\fR) or
+streams mode (\fIS\fR).
+.TP
+.B \-parallel \fIn\fR
+Use \fIn\fR parallel data channels during extended block transfers.
+.TP
+.B \-passive
+Use PASSIVE mode for data transfers.
+.TP
+.B \-pbsz \fIn\fR
+Set the data protection buffer size to \fIn\fR n bytes.
+.TP
+.B \-prot [\fIC\fR|\fIS\fR|\fIE\fR|\fIP\fR]
+Set the data protection lelvel to clear (\fIC\fR), safe (\fIS\fR),
+confidential (\fIE\fR) or private (\fIP\fR).
+.TP
+.B \-retry \fIn\fR
+Retry commands that fail with transient errors \fIn\fR times.
+.TP
+.B \-resume \fIpath\fR
+Retry the recursive transfer starting at \fIpath\fR.
+.TP
+.B \-tcpbuf \fIn\fR
+Set the TCP read/write buffers to \fIn\fR bytes.
+.TP
+.B \-wait
+This will cause the client to wait for remote files to stage before
+attempting to transfer them.
+.TP
+.B \-v
+Print UberFTP version information and exit.
+.TP
+.B \-version
+Print UberFTP version information and exit.
+.TP
+.B \-versions
+Print version information about all used globus modules and exit.
+
+.SH Supported \-cmds
+.TP
+.B \-cat \fIurl\fR
+Print to stdout the contents of the remote file.
+.TP
+.B \-chgrp [\fI-r\fR] \fIgroup\fR \fIurl\fR
+Set the group ownership of the remote object(s).
+.TP
+.B \-chmod [\fI-r\fR] \fIperms\fR \fIurl\fR
+Set the permissions of the remote object(s).
+.TP
+.B \-dir [\fI-r\fR] \fIurl\fR
+List the contents of the remote object.
+.TP
+.B \-ls [\fI-r\fR] \fIurl\fR
+List the contents of the remote object.
+.TP
+.B \-mkdir \fIurl\fR
+Create the remote directory.
+.TP
+.B \-rename \fIurl\fR \fIpath\fR
+Rename the remote object to the given path.
+.TP
+.B \-rm [\fI-r\fR] \fIurl\fR
+Remove the remote object(s).
+.TP
+.B \-rmdir \fIurl\fR
+Remove the remote directory.
+.TP
+.B \-size \fIurl\fR
+Return the size of the remote object.
+.TP
+.B \-stage [\fI-r\fR] \fIseconds\fR \fIurl\fR
+Attempt to stage the remote object(s) over the time
+period given in seconds.
+
+.SH DEFAULT TRANSFER MODE
+.LP
+By default, without any special environment variables, command line options
+or commands, \fBuberftp\fR will transfer files in PASSIVE STREAMS mode.
+PASSIVE means that the client will initiate the data connection which is
+useful for users behind firewalls. STREAMS mode implies that GRIDFTP features
+including striping and parallel data connections are not used. In order to
+take advantage of these features with GridFTP capable servers, you must either
+change the mode directly using \-m command line switch or the 
+.B mode
+interactive command, or you can change the mode indirectly by specifying 
+more than one parallel data connection using the \-c command line switch or
+by using the
+.B parallel
+interactive command.
+
+.SH GETTING YOUR GSI PROXY
+.LP
+.B By default, \fBuberftp\fR requires a GSI certificate. If you do not 
+already have a certificate, see the following web page to learn how to get one:
+
+http://www.ncsa.uiuc.edu/UserInfo/Grid/Security/GetUserCert.html
+
+Once you have a certificate, use the \fBgrid-proxy-init\fR command to get
+a valid proxy.
+
+.SH COMMANDS
+.TP
+.B ! [\fIcommand\fR]
+Run the command using a shell on the local machine. If no command is given,
+invoke an interactive shell.
+.TP
+.B ? [\fIcommand\fR]
+If \fIcommand\fR is given, print a (hopefully) helpful blurb about it.
+Otherwise, list all commands.
+.TP
+.B active
+Change to ACTIVE mode which causes the server to initiate the data
+connection. The default is PASSIVE mode unless the variable
+UBERFTP_ACTIVE_MODE is set in the environment. If you are behind a
+firewall you must use PASSIVE mode.
+.TP
+.B ascii
+Change the data transfer type to ASCII which causes the server to do some
+simple transformations to the file being transferred. This is mostly useful
+for changing EOL (end of line) in text files when moving between platforms.
+This option is almost never necessary today. The default is BINARY mode
+also known as IMAGE mode.
+.TP
+.B binary
+Change the data transfer type to BINARY (aka IMAGE) which causes the server
+to not perform transformations to the file being transferred. This is the
+default and is faster than an ASCII transfer.
+.TP
+.B blksize \fIsize\fR
+Change the size of the memory buffer used to read and write data to disks
+to \fIsize\fR bytes. The default block size is 1024*1024 (1048576) bytes but it can be changed at compile time. The
+block size can be increased to improve file transfer performance. This is
+not related to the extended block mode block size used to determine the
+ratio of data to header for data transferred on the data channel.
+.TP
+.B bugs
+Prints information regarding bug reporting and feature requests.
+.TP
+.B bye
+Close all control and data connections and exit.
+.TP
+.B cat \fIfile1\fR [\fIfile2\fR ... \fIfilen\fR]
+Print the contents of the remote file(s) to stdout.
+.TP
+.B cdup
+Change the remote working directory up one level.
+.TP
+.B cd [\fIdir\fR]
+Change the remote working directory to \fIdir\fR. If \fIdir\fR is not given,
+the client will make every attempt to change to the user's home directory.
+'~' expansion and '-' previous directory are supported.
+
+.TP
+.B chgrp [\fI-r\fR] \fIgroup\fR \fIobject\fR [\fIobject2\fR ... \fIobjectn\fR]
+Change group ownership on the remote object(s).
+.br
+\fI-r\fR   Recursively chgrp everything in the given directory.
+
+.TP
+.B chmod [\fI-r\fR] \fIperms\fR \fIobject\fR [\fIobject2\fR ... \fIobjectn\fR]
+Change permissions on the remote object(s).
+.br
+\fI-r\fR   Recursively chmod everything in the given directory.
+.TP
+.B close
+Close the control connection to the remote host.
+.TP
+.B cksum [\fIon\fR|\fIoff\fR]
+Enable file cksum comparison after each file transfer. This only works with
+NCSA's mass storage system.
+.br
+\fIon\fR    Enable checksum comparison
+.br
+\fIoff\fR   Disable checksum comparison
+.TP
+.B dcau [\fIN\fR|\fIA\fR|\fIS\fR \fIsubject\fR]
+Change the data channel authentication settings. If the service does not
+support DCAU, these settings are ignored.
+.br
+\fIN\fR  Disabled dcau.
+.br
+\fIA\fR  Expect the remote identity to be mine. (Default)
+.br
+\fIS\fR \fIsubject\fR Expect the remote identity to be \fIsubject\fR.
+.TP
+.B debug [\fI0-3\fR]
+Turn debug statements on/off. If no value is given, this command will
+toggle between debug(2) and non debug(1) mode. Otherwise the debug level
+is set to the given level.
+.br
+0  Only errors are printed
+.br
+1  Default. Errors and some helpful messages are printed
+.br
+2  Print useful control channel information
+.br
+3  Print all information
+.TP
+.B family \fIname\fR
+Sets the tape family to \fIname\fR on the FTP service if the service
+supports it. If \fIname\fR is omitted, the current family is printed.
+.TP
+.B glob [\fIon\fR|\fIoff\fR]
+Enable or disable filename globbing. If no option is given, this command
+will toggle the current setting.
+.br
+\fIon\fR    Enable filename globbing
+.br
+\fIoff\fR   Disable filename globbing
+.TP
+.B dir [\fI-r\fR] [\fItarget\fR]
+List the contents of the remote target directory. If \fItarget\fR is not given,
+then the current working directory is used.
+.br
+\fI-r\fR      Recursively list \fItarget\fR.
+.br
+\fItarget\fR  Directory or file to list. '.' is used by default.
+.TP
+.B get [\fI-r\fR] \fIsource\fR [\fIdestination\fR]
+Retreive file(s) from the remote service. If \fIsource\fR implies multiple
+transfers, either through regular expressions or by using the recursive
+feature, then \fIdestination\fR must be a directory. If \fIdestination\fR is not
+specified, \fIsource\fR is used.
+.br
+\fI-r\fR   Recursively transfer the given directory.
+.TP
+.B hash
+Print hash marks during data transfers. This does not work during third
+party transfers.
+.TP
+.B help [\fIcommand\fR]
+If \fIcommand\fR is given, print a helpful blurb about \fIcommand\fR.
+Otherwise, list all commands.
+.TP
+.B keepalive [\fIseconds\fR]
+Attempts to keep the control channel from being blocked by firewalls during
+long data channel operations. UberFTP sends a NOOP command to the service
+at intervals equal to the specified number of \fIseconds\fR. Setting it to zero
+will disable keepalive. If \fIseconds\fR are not given, the current timeout is
+displayed. This feature is disabled by default.
+.br
+seconds  number of seconds between NOOPs. Disabled if zero.
+.TP
+.B lcat \fIfile1\fR [\fIfile2\fR ... \fIfilen\fR]
+Print the contents of the local file(s) to stdout.
+.TP
+.B lcd [\fIdir\fR]
+Change the local working directory to \fIdir\fR. If \fIdir\fR is not given,
+the client will make every attempt to change to the user's home directory.
+'~' expansion and '-' previous directory are supported.
+.TP
+.B lcdup
+Change the local working directory up one level.
+.TP
+.B lchgrp [\fI-r\fR] \fIgroup\fR \fIobject\fR [\fIobject2\fR ... \fIobjectn\fR]
+Change group ownership on the local object(s).
+.br
+\fI-r\fR   Recursively chgrp everything in the given directory.
+
+.TP
+.B lchmod [\fI-r\fR] \fIperms\fR \fIobject\fR [\fIobject2\fR ... \fIobjectn\fR]
+Change permissions on the local object(s).
+.br
+\fI-r\fR   Recursively chmod everything in the given directory.
+.TP
+.B lclose
+Close the control connection to the local host.
+.TP
+.B ldir [\fI-r\fR] [\fItarget\fR]
+List the contents of the local \fItarget\fR directory. If \fItarget\fR is not given,
+then the current working directory is used.
+.br
+\fI-r\fR      Recursively list \fItarget\fR.
+.br
+target  Directory or file to list. '.' is used by default.
+.TP
+.B lls [\fI-r\fR] [\fItarget\fR]
+List the contents of the local \fItarget\fR directory. If \fItarget\fR is not given,
+then the current working directory is used.
+.br
+\fI-r\fR      Recursively list \fItarget\fR.
+.br
+target  Directory or file to list. '.' is used by default.
+.TP
+.B lmkdir  \fIdir1\fR [\fIdir2\fR ... \fIdirn\fR]
+Create the local directory(ies).
+.TP
+.B lopen [\fI-P port\fR] [\fI-u user\fR] [\fI-p pass\fR | \fIX\fR] \fIhost\fR
+Opens a control channel to \fIhost\fR and that host becomes the 'local' machine.
+After using lopen, all local (l*) commands perform their respective
+operations on \fIhost\fR rather than the local machine. This is how third
+party transfers are accomplished. GSI authentication is used unless the
+\fI-p\fR option is used.
+.br
+\fI-P port\fR   Connect to port (Default 2811 for GSI, 21 for password).
+.br
+\fI-u user\fR   Connect as alternate user.
+.br
+\fI-p pass\fR | \fIX\fR
+.br
+          Use password \fIpass\fR when authenticating with \fIhost\fR.
+.br
+          If \fIpass\fR equals \fIX\fR, read the password from STDIN with
+.br
+          character echoing turned off.
+.br
+\fIhost\fR      Connect to \fIhost\fR.
+.TP
+.B lpwd
+Prints the current local working directory.
+.TP
+.B lrename \fIsrc\fR \fIdst\fR
+Rename the local object \fIsrc\fR to \fIdst\fR.
+.TP
+.B lrm [\fI-r\fR] \fIobject1\fR [\fIobject1\fR...\fIobjectn\fR]
+Removes the local file system object(s).
+.br
+\fI-r\fR   Recursively remove the given directory.
+.TP
+.B lrmdir \fIdir1\fR [\fIdir2\fR...\fIdirn\fR]
+Removes the given directories from the local service.
+.TP
+.B lquote \fIcmd\fR
+Pass \fIcmd\fR to the local FTP service. This allows the user to use
+server-specific commands that are not available through the uberftp
+interface.
+.TP
+.B ls [\fI-r\fR] [\fItarget\fR]
+List the contents of the remote target directory. If [\fItarget\fR] is not given,
+then the current working directory is used.
+.br
+\fI-r\fR      Recursively list \fItarget\fR.
+.br
+\fItarget\fR  Directory or file to list. '.' is used by default.
+.TP
+.B lsize \fIfile1\fR [\fIfile2\fR...\fIfilen\fR]
+Prints the size of the given object(s).
+.TP
+.B lstage [\fI-r\fR] \fIseconds\fR \fIobject1\fR [\fIobject2\fR...\fIobjectn\fR]
+Attempt to stage all matching files within the given number of \fIseconds\fR
+on the local service.
+.br
+seconds  number of seconds to attempt staging
+.br
+\fI-r\fR       Recursively stage all files in the given subdirectory.
+.TP
+.B mput [\fI-r\fR] \fIobject1\fR [\fIobject2\fR...\fIobjectn\fR]
+Retrieve file(s) from the remote service. This is similiar to making
+multiple calls to get without specifying a destination.
+.br
+\fI-r\fR   Recursively transfer the given directory.
+.TP
+.B mkdir \fIdir\fR
+Create the remote directory.
+.TP
+.B mode [\fIE\fR|\fIS\fR]
+Toggle the data transfer mode between Streams mode and Extended Block
+mode. The default is Streams mode. If no option is given, it will
+display the current mode.
+.br
+E   Extended block mode
+.br
+S   Streams mode
+.TP
+.B mput [\fI-r\fR] \fIobject1\fR [\fIobject2\fR...\fIobjectn\fR]
+Store file(s) to the remote service. This is similiar to making
+multiple calls to put without specifying a destination.
+.br
+\fI-r\fR   Recursively transfer the given directory.
+.TP
+.B open [\fI-P port\fR] [\fI-u user\fR] [\fI-p pass\fR | \fIX\fR] \fIhost\fR
+Opens a control channel to \fIhost\fR and that host becomes the 'remote'
+machine. GSI authentication is used unless the -p option is used.
+.br
+\fI-P port\fR   Connect to \fIport\fR (Default 2811 for GSI, 21 for password).
+.br
+\fI-u user\fR   Connect as \fIuser\fR.
+.br
+\fI-p pass\fR | \fIX\fR
+.br
+          Use password \fIpass\fR when authenticating with \fIhost\fR.
+.br
+          If \fIpass\fR equals \fIX\fR, read the password from STDIN with
+.br
+          character echoing turned off.
+.br
+\fIhost\fR      Connect to \fIhost\fR.
+.TP
+.B order [\fItype\fR]
+Changes the order of lists returned from ls and lls to the given scheme.
+If \fItype\fR is not given, the current order is displayed.
+.br
+\fItype\fR    Ordering scheme to use. Value options are:
+.br
+           none  Do not order listings
+.br
+           name  Order listings by name
+.br
+           size  Order listings by size
+.br
+           type  Order listings by type
+.TP
+.B parallel [\fInumber\fR]
+Set the number of parallel data connections to \fInumber\fR. This is only
+useful for extended block mode transfers. The default number of data
+connections is one. If no number is given, the current setting for the
+number of parallel connects is printed.
+.TP
+.B passive
+Change to PASSIVE mode which causes the client to initiate the data
+connection. This is the default mode unless the variable
+UBERFTP_ACTIVE_MODE is set in the environment. If you are behind a
+firewall you must use PASSIVE mode.
+.TP
+.B pbsz [\fIsize\fR]
+Change the length of the protection buffer. The protection buffer is used
+to encrypt data on the data channel. The length of the protection buffer
+represents the largest encoded message that is allowed on the data channel.
+By default, the protection buffer is grown to match the internal buffer
+used. For efficient transfers, pbsz should be sufficiently larger than
+blksize so that the wrapped buffer fits within the protection buffer.
+Otherwise, the blksize buffer is broken into multiple pieces so that each
+write is less than pbsz when wrapped. If \fIpbsz\fR is not given, the
+current size is displayed.
+.br
+\fIsize\fR   length of protection buffer. 0 will set it to its default.
+.TP
+.B pget \fIoffset\fR \fIsize\fR \fIsrcfile\fR [\fIdestfile\fR]
+Retrieve only the specified portion of the file(s). If srcfile is a regular
+expression and expands to multiple files, and destination is given,
+destination must refer to a directory.
+.br
+\fIoffset\fR   Offset within the file
+.br
+\fIsize\fR     Amount of data to retrieve
+.br
+\fIsrcfile\fR  Name of remote file
+.br
+\fIdestfile\fR Name of local file. srcfile is used if destfile
+.br
+is not specified
+.TP
+.B pput \fIoffset\fR \fIsize\fR \fIsrcfile\fR [\fIdestfile\fR]
+Store only the specified portion of the file(s). If srcfile is a regular
+expression and expands to multiple files, and destination is given,
+destination must refer to a directory.
+.br
+\fIoffset\fR   Offset within the file
+.br
+\fIsize\fR     Amount of data to retrieve
+.br
+\fIsrcfile\fR  Name of local file
+.br
+\fIdestfile\fR Name of remote file. srcfile is used if destfile
+.br
+         is not specified
+.TP
+.B prot [\fIC\fR|\fIS\fR|\fIE\fR|\fIP\fR]
+This command configures the level of security on the data channel after
+data channel authentication has completed. Clear means that the data will
+not be protected. Safe means that the data will be integrity protected
+meaning that altered data will be detected. Confidential means that the data
+will be unreadable to third parties. Private mode means the data will be
+confidential and safe.
+.br
+\fIC\fR  Set protection level to clear.
+.br
+\fIS\fR  Set protection level to safe.
+.br
+\fIE\fR  Set protection level to confidential.
+.br
+\fIP\fR  Set protection level to private.
+.TP
+.B get [\fI-r\fR] \fIsource\fR [\fIdestination\fR]
+Store file(s) to the remote service. If \fIsource\fR implies multiple
+transfers, either through regular expressions or by using the recursive
+feature, then \fIdestination\fR must be a directory. If \fIdestination\fR is not
+specified, \fIsource\fR is used.
+.br
+\fI-r\fR   Recursively transfer the given directory.
+.TP
+.B pwd
+Prints the current working directory.
+.TP
+.B quit
+Close all control and data connections and exit.
+.TP
+.B quote \fIcmd\fR
+Pass \fIcmd\fR to the remote FTP service. This allows the user to use
+server-specific commands that are not available through the uberftp
+interface.
+.TP
+.B rename \fIsrc\fR \fIdst\fR
+Rename the remote object \fIsrc\fR to \fIdst\fR.
+.TP
+.B retry [\fIcnt\fR]
+Configures retry on failed commands that have transient errors. \fIcnt\fR
+represents the number of times a failed command is retried. A value of
+zero effectively disables retry. Zero is the default. If no value is given
+the current setting is displayed.
+.br
+\fIcnt\fR    Number of times a failed command is retried.
+.TP
+.B resume [\fI-d\fR] \fIpath\fR
+Sets a restart point for recursive transfers. If a long recursive transfer
+fails, you can set resume to the path that failed and UberFTP will skip
+all file and directory creations up to the given path.
+.br
+\fIpath\fR   Path to resume transfer at. If \fIpath\fR is not given, print the current
+.br
+       resume target.
+.br
+\fI-d\fR     Remove the current resume path.
+.TP
+.B rm [\fI-r\fR] \fIobject1\fR [\fIobject1\fR...\fIobjectn\fR]
+Removes the remote file system object(s).
+.br
+\fI-r\fR   Recursively remove the given directory.
+.TP
+.B rmdir \fIdir1\fR [\fIdir2\fR...\fIdirn\fR]
+Removes the given directories from the remote service.
+.TP
+.B runique
+Toggles the client to store files using unique names during put operations.
+.TP
+.B size \fIfile1\fR [\fIfile2\fR...\fIfilen\fR]
+Prints the size of the given object(s).
+.TP
+.B stage [\fI-r\fR] \fIseconds\fR \fIobject1\fR [\fIobject2\fR...\fIobjectn\fR]
+Attempt to stage all matching files within the given number of seconds
+on the remote service.
+.br
+\fIseconds\fR  number of seconds to attempt staging
+.br
+\fI-r\fR       Recursively stage all files in the given subdirectory.
+.TP
+.B sunique
+Toggles the client to store files using unique names during get operations.
+.TP
+.B tcpbuf [\fIsize\fR]
+Set the data channel TCP buffer size to \fIsize\fR bytes. If \fIsize\fR is not
+given, the current TCP buffer size will be printed.
+.TP
+.B versions
+Prints the versions of all Globus modules being used.
+.TP
+.B wait
+Toggles whether the client should wait for files to stage before attempting
+to retrieve them.
+
+
+.SH IMPROVING FILE TRANSFER PERFORMANCE
+.LP
+Use the \fBactive\fR command to enable \fIactive\fR mode FTP when 
+using NCSA's UniTree mass storage system if possible since it 
+will give much better file transfer performance.
+When tranferring files over long distances, use a large value (for example, 
+16777216) for \fBtcpbuf\fR.
+When there is high network traffic, you may be able to improve 
+performance using the \fBparallel\fR command to increase the number of
+parallel data connections to 2-4.
+.SH THIRD-PARTY TRANSFERS
+.LP
+In order to perform a third-party transfer, you must log into two 
+\fBFTP\fR servers. Typically, you connect to a single \fBFTP\fR service to 
+"get" files to the local machine and "put" files to the remote service. 
+For third-party transfers, you must connect to a second service 
+thereby replacing the former local machine. In \fBUberFTP\fR terminology, 
+it is referred to as "opening a new local service" since, from 
+the perspective of the user, the new local service will appear 
+as though the user initiated the FTP session from that machine. 
+
+All remote service commands have "l*" counterparts that allow you 
+to specify that the command is to be performed on the local service, 
+whether that service is the local machine or a new local service. 
+So to open a new local service, use the "l*" version of the open command: 
+
+  UberFTP> lopen mss.ncsa.teragrid.org
+  UberFTP> lclose
+      
+Once you have connected to both services, files can be transferred as 
+before with the change that files you "get" go to the new local service 
+and files you "put" are sent from the new local service. 
+.SH CONTROLLING EPHEMERAL PORT SELECTION
+.LP
+By default, local port selection is managed by the operating system. However,
+you may wish to specify which ports UberFTP should use for incoming and 
+out going connections. This is useful when dealing with firewalls.
+
+Setting UBERFTP_TCP_PORT_RANGE in your environment will cause all inbound
+connections to use the specified port range. Likewise, setting
+UBERFTP_TCP_SOURCE_RANGE in your environment will cause all outbound connections
+to use the specified port range.
+
+The environment variables GLOBUS_TCP_PORT_RANGE and GLOBUS_TCP_SOURCE_RANGE
+will also control the ephemeral port selection. These variables behave exactly
+as their UBERFTP counterparts and are available for backwards compatibility with
+older versions. The UBERFTP variables take precedence over the GLOBUS variables.
+
+The values of the variables specify a port range, a minimum port number and a
+maximum port number, separated by either a comma or a space. For example, to
+set the inbound port range, you would set:
+
+  UBERFTP_TCP_PORT_RANGE=40000,50000
+
+Using the space delimiter, this format is also acceptable:
+
+  UBERFTP_TCP_PORT_RANGE="40000 50000"
+
+See your shell documentation for the proper syntax for settings variables within
+your environment.
+
+Setting the ephemeral port range to an unusable range will cause UberFTP connections
+to fail. For instance, setting a port range from 10 to 100 with a non root process will
+fail on most operating systems.
+
+.SH EXIT VALUES
+.LP
+UberFTP will exit with a value of 0 if no errors occurred during the session,
+otherwise it will exit with a value of 1. In non interactive, commandline mode,
+it will exit after the first error occurs.
+.SH EXAMPLES
+.LP
+Set the environment variable to set \fIactive\fR mode FTP 
+(improves file transfer performance to the mass storage system).
+Connect to NCSA's UniTree mass storage system interactively from 
+NCSA's TeraGrid cluster:
+
+  setenv UBERFTP_ACTIVE_MODE on
+  % uberftp mss.ncsa.teragrid.org
+  ...
+  220 UNIX Archive FTP server ready.
+  230 User consult logged in.
+  UberFTP>
+
+Use the command-line interface to copy a file from NCSA's TeraGrid cluster 
+to the UniTree mass storage system. (There is no need to set
+\fBtcpbuf\fR since it is over a LAN but \fIactive\fR mode is turned on
+to improve file transfer performance to the mass storage system.):
+
+  uberftp mss.ncsa.teragrid.org \\
+     "active; cd work; get file.tar"
+
+Copy a file from SDSC's TeraGrid cluster to NCSA's TeraGrid cluster.
+(Note that \fBtcpbuf\fR is set to 16777216 since there is a long
+network latency between NCSA and SDSC):
+
+  uberftp tg-gridftp.sdsc.teragrid.org \\
+     "tcpbuf 16777216; cd scr; put file.tar"
+.SH "SEE ALSO"
+.BR mssftp (1),
+.BR msscmd (1),
+.BR ftp (1),
+.br
+GridFTP:
+.br
+  http://www.globus.org/datagrid/gridftp.html
+.br
+TCP Window Size:
+.br
+  http://dast.nlanr.net/Articles/GettingStarted/TCP_window_size.html
+.br
+Active vs. Passive FTP: 
+.br
+  http://slacksite.com/other/ftp.html
+
+\fBNote: The links above are not under NCSA's control 
+so they may become obsolete.\fR
+

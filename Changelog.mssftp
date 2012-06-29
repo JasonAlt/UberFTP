@@ -1,0 +1,61 @@
+Version 2.9 8/5/10
+    - Fixed a segfault found on a UV10 running SLES11. The crash occurs
+      when the client tries to print out the server MOTD and the MOTD
+      has '%' embedded in it.
+
+Version 2.8 9/08/09
+	- Removed warnings at connect when service does not support MLST
+	- Fixed directory listings on systems that do not support MLST
+	- Removed mlsx usage from the manpage
+	- No longer issue MLST/MLSD commands for parent directories unless
+	  a regular expression is encountered. This is a slight performance
+	  boost and a workaround for services that disallow access to parent
+	  directories.
+	- Fixed timestamps when listing in recursive or using regular
+	  expressions. Timestamps are now shown in your local timezone.
+	- Fixed typos in 'put' help message and 'Unknown commad'
+
+
+Version 2.7  4/17/09
+	- Fixed misspelling of argument
+	- Added support for GLOBUS_TCP_PORT_RANGE, GLOBUS_TCP_SOURCE_RANGE,
+	  UBERFTP_TCP_PORT_RANGE and UBERFTP_TCP_SOURCE_RANGE. The GLOBUS_*
+	  versions are there for backwards compatibility. The UBERFTP_*
+	  versions do the same things as their GLOBUS_* counterparts. The
+	  UBERFTP_* versions will override the GLOBUS_* versions if both
+	  are available.
+	- Fixed a segfault in the stage command
+
+
+Version 2.6  11/12/08
+	- Fixed directory listings when using 'order' settings. The target
+	  directory no longer appears in the output. './' is no longer
+	  prefixed to 'ls' output. Target directories are now expanded in
+	  the listing output.
+	- Destination file removed after transfer failure unless using
+	  pget or pput
+	- Adjusted the list output to be a bit more readable
+	- Fix for matching names when glob is disabled
+	- rm and ls will continue after an error is encounted
+	- mssftp will attempt to stage a file before retrieval even if wait
+	  is disabled. A more detailed message is returned to the user if the
+	  file is not on disk.
+	- recursive or regular expression transfers which transfer multiple
+	  files will continue after errors are encountered until the current
+	  command has completed
+
+
+Version 2.5  10/24/08
+	- Added polling when reading server responses to keep the client from
+	  heavily using the CPU during 'quote stage 60'
+	- Added --with-tcp-window to the configure script to allow the default
+	  TCP window to be set specific to the host system.
+	- Added -with-blksize to the configure script to allow the default
+	  internal buffer size to be set for optimal performance on the host
+	  system.
+	- Client will now truncate the local destination file if it exists
+	- Changed data channel protection level to 'clear' to greatly improve
+	  performance by default
+	- Fix for NAME_MAX on AIX, now use pathconf()
+	- Fix for lcd -
+	- Fix for 'ALLO 0' on some 32 bit platforms
