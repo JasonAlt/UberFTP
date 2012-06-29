@@ -99,15 +99,12 @@ typedef struct ftp_handle {
 	int hasMlst;
 	int hasEsto;
 	int hasEret;
-	int hasSetfam;
 	int hasSiteSetfam;
 	int hasSiteSetCos;
 	int hasPasv;
 	int hasAllo;
 	int hasSize;
-	int hasWind;
 	int hasSbuf;
-	int hasSiteBufsize;
 	int hasStage;
 	int hasSiteStage;
 	int hasMFMT;
@@ -263,16 +260,13 @@ ftp_connect(pd_t *  pd,
 
 	/* Set the default features. */
     fh->hasChgrp       = 1;
-    fh->hasSetfam      = 1;
     fh->hasSiteSetfam  = 1;
 	fh->hasSiteSetCos  = 1;
     fh->hasSiteSum     = 1;
     fh->hasPasv        = 1;
     fh->hasAllo        = 1;
     fh->hasSize        = 1;
-    fh->hasWind        = 1;
     fh->hasSbuf        = 1;
-    fh->hasSiteBufsize = 1;
     fh->hasStage       = 1;
     fh->hasSiteStage   = 1;
     fh->hasMFMT        = 1;
@@ -526,72 +520,50 @@ ftp_stor(pd_t * pd,
 	}
 
 	/* Set family. */
-	if (s_family())
+	if (s_family() && fh->hasSiteSetfam)
 	{
-		while (fh->hasSetfam || fh->hasSiteSetfam)
+		/* Construct the command */
+		cmd = Sprintf(NULL, "SITE SETFAM %s", s_family());
+
+		/* Send the command */
+		ec  = _f_send_cmd(fh, cmd);
+
+		/* Release the command before we return an error. */
+		FREE(cmd);
+
+		/* Check error status. */
+		if (ec)
+			return ec;
+
+		/* Get the response. */
+		ec = _f_get_final_resp(fh, &code, &resp);
+		if (ec)
+			return ec;
+
+		/* If the server didn't recognize the command... */
+		if (F_CODE_UNKNOWN(code))
 		{
-			/* Construct the command */
-			if (fh->hasSetfam)
-				cmd = Sprintf(NULL, "SETFAM %s", s_family());
-			else /* fh->hasSiteSetfam */
-				cmd = Sprintf(NULL, "SITE SETFAM %s", s_family());
+			fh->hasSiteSetfam = 0;
 
-			/* Send the command */
-			ec  = _f_send_cmd(fh, cmd);
-
-			/* Release the command before we return an error. */
-			FREE(cmd);
-
-			/* Check error status. */
-			if (ec)
-				return ec;
-
-			/* Get the response. */
-			ec = _f_get_final_resp(fh, &code, &resp);
-			if (ec)
-				return ec;
-
-			/* If the server didn't recognize the command... */
-			if (F_CODE_UNKNOWN(code))
-			{
-				/* Make sure we check these in the same order. */
-				if (fh->hasSetfam)
-					fh->hasSetfam = 0;
-				else
-					fh->hasSiteSetfam = 0;
-
-				/* Free the response. */
-				FREE(resp);
-
-				/* Start over. */
-				continue;
-			}
-
-			/* If an error of some sort occurred... */
-			if (!F_CODE_SUCC(code))
-			{
-				/* Create the error code. */
-				ec = ec_create(EC_GSI_SUCCESS,
-				               EC_GSI_SUCCESS,
-				               "Failed to set the desired family:\n%s",
-				               resp);
-
-				/* Free the response. */
-				FREE(resp);
-
-				/* Return the error. */
-				return ec;
-			}
-
-			/*
-			 * Success!
-			 */
+			/* Free the response. */
+			FREE(resp);
+		} else if (!F_CODE_SUCC(code)) /* If an error of some sort occurred... */
+		{
+			/* Create the error code. */
+			ec = ec_create(EC_GSI_SUCCESS,
+			               EC_GSI_SUCCESS,
+			               "Failed to set the desired family:\n%s",
+			               resp);
 
 			/* Free the response. */
 			FREE(resp);
 
-			/* Break out of the loop. */
-			break;
+			/* Return the error. */
+			return ec;
+		} else /* Success! */
+		{
+			/* Free the response. */
+			FREE(resp);
 		}
 	}
 
@@ -632,7 +604,7 @@ ftp_stor(pd_t * pd,
 				/* Create the error code. */
 				ec = ec_create(EC_GSI_SUCCESS,
 				               EC_GSI_SUCCESS,
-				               "Failed to set the desired family:\n%s",
+				               "Failed to set the desired COS:\n%s",
 				               resp);
 
 				/* Free the response. */
@@ -1331,6 +1303,7 @@ send_cmd:
 	cptr = Strdup(cmd);
 	if ((token = StrtokEsc(cptr, ' ', &next)))
 	{
+		/* Remove this after NCSA MSS is shutdown. */
 		if (strcasecmp(token, "SETFAM") == 0)
 		{
 			if (strlen(next) > 0)
@@ -2479,19 +2452,11 @@ _f_setup_tcp(fh_t * fh, fh_t * ofh)
 	if (!wsize)
 		return EC_SUCCESS;
 
-	if (fh->hasWind)
-	{
-		cmd = Sprintf(NULL, "WIND %d", wsize);
-		ec = _f_send_cmd(fh, cmd);
-	} else if (fh->hasSbuf)
-	{
-		cmd = Sprintf(NULL, "SBUF %d", wsize);
-		ec = _f_send_cmd(fh, cmd);
-	} else if (fh->hasSiteBufsize)
-	{
-		cmd = Sprintf(NULL, "SITE BUFSIZE %d", wsize);
-		ec = _f_send_cmd(fh, cmd);
-	}
+	if (!fh->hasSbuf)
+		return EC_SUCCESS;
+	
+	cmd = Sprintf(NULL, "SBUF %d", wsize);
+	ec = _f_send_cmd(fh, cmd);
 	FREE(cmd);
 
 	if (ec)
@@ -2504,14 +2469,10 @@ _f_setup_tcp(fh_t * fh, fh_t * ofh)
 
 	if (F_CODE_UNKNOWN(code))
 	{
-		if (fh->hasWind)
-			fh->hasWind = 0;
-		else if (fh->hasSbuf)
+		if (fh->hasSbuf)
 			fh->hasSbuf = 0;
-		else if (fh->hasSiteBufsize)
-			fh->hasSiteBufsize = 0;
 
-		return _f_setup_tcp(fh, ofh);
+		return EC_SUCCESS;
 	}
 
 	return EC_SUCCESS;
