@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -49,6 +49,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <utime.h>
 #include <pwd.h>
 #include <grp.h>
 
@@ -919,6 +920,80 @@ unix_cksum (pd_t * pd, char * file, int * supported, unsigned int * crc)
 	return ec;
 }
 
+errcode_t
+unix_link(pd_t * pd, char * oldfile, char * newfile)
+{
+	int       retval = 0;
+	errcode_t ec     = EC_SUCCESS;
+
+	/* Create the hard link. */
+	retval = link(oldfile, newfile);
+
+	/* If it failed... */
+	if (retval != 0)
+	{
+		/* Construct the error. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Failed to create the hardlink: %s",
+		               strerror(errno));
+	}
+
+	/* Return the error code. */
+	return ec;
+}
+
+errcode_t
+unix_symlink(pd_t * pd, char * oldfile, char * newfile)
+{
+	int       retval = 0;
+	errcode_t ec     = EC_SUCCESS;
+
+	/* Create the symbolic link. */
+	retval = symlink(oldfile, newfile);
+
+	/* If it failed... */
+	if (retval != 0)
+	{
+		/* Construct the error. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Failed to create the symlink: %s",
+		               strerror(errno));
+	}
+
+	/* Return the error code. */
+	return ec;
+}
+
+errcode_t
+unix_utime(pd_t * pd, char * path, time_t timestamp)
+{
+	int            retval = 0;
+	errcode_t      ec     = EC_SUCCESS;
+	struct utimbuf utimbuf;
+
+	utimbuf.actime  = timestamp;
+	utimbuf.modtime = timestamp;
+
+	/* Create the symbolic link. */
+	retval = utime(path, &utimbuf);
+
+	/* If it failed... */
+	if (retval != 0)
+	{
+		/* Construct the error. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Failed update timestamps on %s : %s",
+		               path,
+		               strerror(errno));
+	}
+
+	/* Return the error code. */
+	return ec;
+}
+
 #ifdef SYSLOG_PERF
 char *
 unix_rhost (pd_t * pd)
@@ -954,6 +1029,9 @@ const Linterface_t UnixInterface = {
 	unix_expand_tilde,
 	unix_stage,
 	unix_cksum,
+	unix_link,
+	unix_symlink,
+	unix_utime,
 #ifdef SYSLOG_PERF
 	unix_rhost,
 #endif /* SYSLOG_PERF */

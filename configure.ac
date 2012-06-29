@@ -1,7 +1,7 @@
 dnl
 dnl  University of Illinois/NCSA Open Source License
 dnl
-dnl  Copyright © 2003-2010, NCSA.  All rights reserved.
+dnl  Copyright © 2003-2012, NCSA.  All rights reserved.
 dnl
 dnl  Developed by:
 dnl
@@ -42,25 +42,14 @@ dnl
 dnl Process this file with autoconf to produce a configure script.
 # First [] is used as the prompt
 # Last [] is used for the version information
-AC_INIT([UberFTP], [2.6], [Jason Alt <jalt@ncsa.uiuc.edu>],[uberftp-client])
-#AC_INIT([ftp], [2.8], [Jason Alt <jalt@ncsa.uiuc.edu>],[mssftp-client])
+AC_INIT(UberFTP (2.7 BETA 3), [2.7_BETA_3], [Jason Alt <jalt@ncsa.uiuc.edu>],[uberftp-client])
 AM_INIT_AUTOMAKE 
 
 GPT_MAJOR="2"
-GPT_MINOR="6"
+GPT_MINOR="7"
 AC_SUBST(GPT_MAJOR)
 AC_SUBST(GPT_MINOR)
 AC_OUTPUT(pkg_data_src.gpt)
-
-# Check which c compiler we are using
-AC_PROG_CC
-
-# Tru64 fix
-AC_CHECK_FUNCS(strtoll)
-
-# autoheader will use this to create config.h
-AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile])
 
 # Check for an MSSFTP build
 AC_ARG_ENABLE(mssftp,
@@ -95,9 +84,9 @@ AC_ARG_ENABLE(static-build,
 	[  staticbuild="$enableval"  ],
 	[  staticbuild="no"  ]
 )
-linktype="shared"
+linkflag=""
 if test "x$staticbuild" = "xyes" ; then
-	linktype="static"
+	linkflag="--static"
 fi
 
 # Check whether the user has a Globus flavor type
@@ -136,7 +125,7 @@ fi
 if test ! -d "$globus_location" ; then
 	AC_MSG_ERROR(--with-globus=PATH must specify a valid path)
 fi
-
+export GLOBUS_LOCATION=$globus_location
 
 # Find GPT_LOCATION
 gpt_location="no"
@@ -159,6 +148,7 @@ fi
 if test ! -d "$gpt_location" ; then
 	AC_MSG_ERROR(--with-gpt=PATH must specify a valid path $gpt_location)
 fi
+export GPT_LOCATION=$gpt_location
 
 # Default TPC Window Sizing
 AC_ARG_WITH(tcp-window,
@@ -176,40 +166,76 @@ AC_ARG_WITH(blksize,
 )
 AC_DEFINE_UNQUOTED(DEFAULT_BLKSIZE, $default_blksize, [ Setting the default buffer size ])
 
-# Now determine the link flags
-AC_MSG_CHECKING(for GPT linkline helper)
-if test -x $gpt_location/sbin/gpt_build_config ; then
-	gpt_linkline_helper="$gpt_location/sbin/gpt_build_config"
+#
+# Find globus-makefile-header so we can build our cflags, ldflags, compiler choice, etc
+#
+AC_MSG_CHECKING(for globus-makefile-header)
+if test -x $gpt_location/bin/globus-makefile-header ; then
+	globus_makefile_header="$gpt_location/bin/globus-makefile-header"
 else
-	AC_MSG_ERROR(Cannot find gpt_build_config: GPT installation is incomplete)
-fi
-AC_MSG_RESULT(yes)
-
-#
-# Build Globus linkline
-#
-GLOBUS_LOCATION=$globus_location
-GLOBUS_FLAVOR_NAME=${globus_flavor}
-export GLOBUS_LOCATION
-export GLOBUS_FLAVOR_NAME
-${gpt_linkline_helper} -f ${globus_flavor} -link ${linktype} -src pkg_data_src.gpt
-
-. ./gpt_build_temp.sh
-rm -f ./gpt_build_temp.sh
-
-AC_MSG_CHECKING(for Globus linkline)
-if test -z "$GPT_CONFIG_PGM_LINKS" ; then
-	AC_MSG_ERROR(gpt_build_config failed)
+	AC_MSG_ERROR(Cannot find globus-makefile-header: GPT installation is incomplete)
 fi
 AC_MSG_RESULT(yes)
 
 
-GLOBUS_CFLAGS="$GPT_CONFIG_CFLAGS -I$globus_location/include/$globus_flavor"
-GLOBUS_LIBS="$GPT_CONFIG_PGM_LINKS $GPT_CONFIG_LIBS"
-GLOBUS_LDFLAGS="-L$globus_location/lib"
+#
+# Now run globus-makefile-header
+#
+echo "${globus_makefile_header} --flavor=${globus_flavor} $linkflag globus_gssapi_gsi"
+${globus_makefile_header} --flavor=${globus_flavor} $linkflag globus_gssapi_gsi 2>/dev/null | sed 's/ = \(.*\)/="\1"/' > ./.globus_makefile_header.output
+. ./.globus_makefile_header.output
+rm -f ./.globus_makefile_header.output
 
+AC_MSG_CHECKING(for Globus compiler choice)
+if test -z "$GLOBUS_CC" ; then
+	AC_MSG_ERROR(GLOBUS_CC missing)
+fi
+AC_MSG_RESULT(yes)
+
+AC_MSG_CHECKING(for Globus cflags)
+if test -z "$GLOBUS_CFLAGS" ; then
+	AC_MSG_ERROR(GLOBUS_CFLAGS missing)
+fi
+AC_MSG_RESULT(yes)
+
+AC_MSG_CHECKING(for Globus includes)
+if test -z "$GLOBUS_INCLUDES" ; then
+	AC_MSG_ERROR(GLOBUS_INCLUDES missing)
+fi
+AC_MSG_RESULT(yes)
+
+AC_MSG_CHECKING(for Globus libraries)
+if test -z "$GLOBUS_PKG_LIBS" ; then
+	AC_MSG_ERROR(GLOBUS_PKG_LIBS missing)
+fi
+AC_MSG_RESULT(yes)
+
+AC_MSG_CHECKING(for Globus ldflags)
+if test -z "$GLOBUS_LDFLAGS" ; then
+	AC_MSG_ERROR(GLOBUS_LDFLAGS missing)
+fi
+AC_MSG_RESULT(yes)
+
+# Set our compiler choice
+CC=$GLOBUS_CC
+AC_PROG_CC()
+
+# Tru64 fix
+AC_CHECK_FUNCS(strtoll)
+
+# autoheader will use this to create config.h
+AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_FILES([Makefile])
+
+AC_SUBST(GLOBUS_CC)
 AC_SUBST(GLOBUS_CFLAGS)
-AC_SUBST(GLOBUS_LIBS)
+AC_SUBST(GLOBUS_INCLUDES)
+AC_SUBST(GLOBUS_PKG_LIBS)
 AC_SUBST(GLOBUS_LDFLAGS)
+
+# This hack is in until I can figure out why globus_makefile_header in 
+# 5.2.x does not return include/globus/<flavor>/
+AC_SUBST(GLOBUS_LOCATION)
+AC_SUBST(GLOBUS_FLAVOR_NAME)
 
 AC_OUTPUT

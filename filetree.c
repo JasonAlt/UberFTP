@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -93,7 +93,6 @@ struct file_tree_handle
 static fte_t * _ft_get_leaf(fth_t * fth);
 static int     _ft_next_state(fth_t * fth, fte_t * leaf);
 static int     _ft_leaf_depth(fte_t * leaf);
-static int     _ft_max_depth(fth_t * fth);
 static char *  _ft_path(fte_t * fte);
 static void    _ft_grow_leaf(fth_t *, fte_t * leaf);
 static void    _ft_stat(fth_t * fth, fte_t * leaf, char * token);

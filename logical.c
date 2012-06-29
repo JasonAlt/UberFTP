@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -38,7 +38,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
+#include <sys/types.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "linterface.h"
 #include "logical.h"
@@ -282,6 +284,24 @@ errcode_t
 l_cksum(lh_t lh, char * file, int * supported, unsigned int * crc)
 {
 	return lh->li.cksum(&lh->privdata, file, supported, crc);
+}
+
+errcode_t
+l_link(lh_t lh, char * oldfile, char * newfile)
+{
+	return lh->li.link(&lh->privdata, oldfile, newfile);
+}
+
+errcode_t
+l_symlink(lh_t lh, char * oldfile, char * newfile)
+{
+	return lh->li.symlink(&lh->privdata, oldfile, newfile);
+}
+
+errcode_t
+l_utime(lh_t lh, char * path, time_t timestamp)
+{
+	return lh->li.utime(&lh->privdata, path, timestamp);
 }
 
 #ifdef SYSLOG_PERF

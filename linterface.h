@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -44,6 +44,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <globus_common.h>
 
@@ -100,6 +101,9 @@ typedef struct {
 	errcode_t (*expand_tilde)(pd_t *, char * tilde, char ** fullpath);
 	errcode_t (*stage) (pd_t *, char * file, int * staged);
 	errcode_t (*cksum) (pd_t *, char * file, int * supported, unsigned int * crc);
+	errcode_t (*link)(pd_t *, char * oldpath, char * newpath);
+	errcode_t (*symlink)(pd_t *, char * oldpath, char * newpath);
+	errcode_t (*utime)(pd_t *, char * path, time_t timestamp);
 #ifdef SYSLOG_PERF
 	char *    (*rhost) (pd_t *);
 #endif /* SYSLOG_PERF */

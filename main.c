@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010, NCSA.  All rights reserved.
+ * Copyright © 2003-2012, NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -128,7 +128,6 @@ int
 main(int argc, char * argv[])
 {
 	cmdret_t  cr = CMD_SUCCESS;
-	errcode_t ec = EC_SUCCESS;
 	char * input = NULL;
 	char * shost, * dhost = NULL;
 	char * sport, * dport = NULL;
@@ -349,7 +348,8 @@ printf(
   "\t-d            Enable debugging. Same as '-debug 3'. Deprecated.\n"
 #endif /* MSSFTP */
   "\t-debug   n    Set the debug level to n.\n"
-  "\t-family  name Set the remote storage family to name.\n"
+  "\t-family  name Set the storage family to name.\n"
+  "\t-cos     name Set the storage class of service to name.\n"
 #ifdef MSSFTP
   "\t-g            Disable filename globbing. Same as '-glob off'. Deprecated.\n"
 #endif /* MSSFTP */
@@ -392,6 +392,8 @@ printf(
   "\t              Set the permissions on the remote object(s).\n"
   "\t-dir [-r] <url>\n"
   "\t              List the contents of the remote object.\n"
+  "\t-link <url> <path>\n"
+  "\t              Create a hardlink to the remote object named <path>.\n"
   "\t-ls [-r] <url>\n"
   "\t              List the contents of the remote object.\n"
   "\t-mkdir <url>\n"
@@ -407,6 +409,8 @@ printf(
   "\t-stage -r seconds <url>\n"
   "\t              Attempt to stage the remote object(s) over the time\n"
   "\t              period given in seconds.\n"
+  "\t-symlink <url> <path>\n"
+  "\t              Create a symlink to the remote object named <path>.\n"
   "\n"
   "Note: uberftp uses passive STREAMS mode by default.\n"
 #else /* !MSSFTP */
@@ -560,6 +564,7 @@ _m_is_opt_arg(char * argv[], int * i)
 	    (val = _m_grab_opt_arg(argv, "-cksum",     i, 1))||
 	    (val = _m_grab_opt_arg(argv, "-debug",     i, 1))||
 	    (val = _m_grab_opt_arg(argv, "-family",    i, 1))||
+	    (val = _m_grab_opt_arg(argv, "-cos",       i, 1))||
 #ifdef MSSFTP
 	    (val = _m_grab_opt_arg(argv, "-i",         i, 0))||
 	    (val = _m_grab_opt_arg(argv, "-d",         i, 0))||
@@ -660,6 +665,7 @@ _m_check_options(char * argv[], int * i)
 	    (val = _m_grab_opt_arg(argv, "-cksum",     i, 1))||
 	    (val = _m_grab_opt_arg(argv, "-debug",     i, 1))||
 	    (val = _m_grab_opt_arg(argv, "-family",    i, 1))||
+	    (val = _m_grab_opt_arg(argv, "-cos",       i, 1))||
 #ifdef MSSFTP
 	    (val = _m_grab_opt_arg(argv, "-d",         i, 0))||
 	    (val = _m_grab_opt_arg(argv, "-g",         i, 0))||
@@ -760,17 +766,19 @@ _m_is_cmd_arg(char * arg)
 	if (*arg != '-')
 		return 0;
 
-	if (strcmp(arg, "-cat")    == 0 ||
-	    strcmp(arg, "-chgrp")  == 0 ||
-	    strcmp(arg, "-chmod")  == 0 ||
-	    strcmp(arg, "-dir")    == 0 ||
-	    strcmp(arg, "-ls")     == 0 ||
-	    strcmp(arg, "-mkdir")  == 0 ||
-	    strcmp(arg, "-rename") == 0 ||
-	    strcmp(arg, "-rm")     == 0 ||
-	    strcmp(arg, "-rmdir")  == 0 ||
-	    strcmp(arg, "-size")   == 0 ||
-	    strcmp(arg, "-stage")  == 0)
+	if (strcmp(arg, "-cat")     == 0 ||
+	    strcmp(arg, "-chgrp")   == 0 ||
+	    strcmp(arg, "-chmod")   == 0 ||
+	    strcmp(arg, "-dir")     == 0 ||
+	    strcmp(arg, "-link")    == 0 ||
+	    strcmp(arg, "-ls")      == 0 ||
+	    strcmp(arg, "-mkdir")   == 0 ||
+	    strcmp(arg, "-rename")  == 0 ||
+	    strcmp(arg, "-rm")      == 0 ||
+	    strcmp(arg, "-rmdir")   == 0 ||
+	    strcmp(arg, "-size")    == 0 ||
+	    strcmp(arg, "-symlink") == 0 ||
+	    strcmp(arg, "-stage")   == 0)
 	{
 		return 1;
 	}
@@ -839,17 +847,19 @@ _m_parse_cmd_args(int argc, char * argv[])
 			continue;
 
 		ind   = i;
-		if ((cmd = _m_check_cmd(argv, "-cat",    &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-chgrp",  &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-chmod",  &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-dir",    &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-ls",     &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-mkdir",  &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-rename", &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-rm",     &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-rmdir",  &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-size",   &i, &url)) ||
-		    (cmd = _m_check_cmd(argv, "-stage",  &i, &url)))
+		if ((cmd = _m_check_cmd(argv, "-cat",     &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-chgrp",   &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-chmod",   &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-dir",     &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-link",    &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-ls",      &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-mkdir",   &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-rename",  &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-rm",      &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-rmdir",   &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-size",    &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-symlink", &i, &url)) ||
+		    (cmd = _m_check_cmd(argv, "-stage",   &i, &url)))
 		{
 			if (cmdlist)
 			{

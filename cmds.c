@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -45,6 +45,7 @@
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <termios.h>
+#include <string.h>
 #include <dirent.h>
 #include <libgen.h>
 #include <string.h>
@@ -90,7 +91,7 @@
 
 #define C_A_CMD         0x00
 #define C_A_NOARGS      0x01
-#define C_A_OINT        0x02
+#define C_A_OINT        0x02 /* Optional 32bit integer. */
 #define C_A_STRINGS     0x03 /* Expect 1 string, then optional strings. */
 #define C_A_OSTRINGS    0x04 /* Optional strings. */
 #define C_A_STRING      0x05 /* Expect 1 string.  */
@@ -105,6 +106,7 @@
 #define C_A_OCH_OSTRING 0x0E
 #define C_A_2STRINGPLUS 0x0F /* Expect 2 strings, possibly more. */
 #define C_A_2OSTRINGS   0x10 /* Possibly 2 strings. */
+#define C_A_OLONG       0x11 /* Optional 64bit integer. */
 
 #define C_A_OPT_P    0x020
 #define C_A_OPT_p    0x040
@@ -145,7 +147,7 @@ static cmd_t   * _c_lookup(char * cmd);
 static cmdret_t  _c_active();
 static cmdret_t  _c_ascii();
 static cmdret_t  _c_binary();
-static cmdret_t  _c_blksize(int size);
+static cmdret_t  _c_blksize(long long size);
 static cmdret_t  _c_bugs();
 static cmdret_t  _c_cat(ch_t *, char ** files);
 static cmdret_t  _c_cdup(ch_t *);
@@ -154,6 +156,7 @@ static cmdret_t  _c_chgrp(ch_t *, int rflag, char * group, char ** files);
 static cmdret_t  _c_chmod(ch_t *, int rflag, int perms, char ** files);
 static cmdret_t  _c_close(ch_t *);
 static cmdret_t  _c_cksum(char * val);
+static cmdret_t  _c_cos(char * cos);
 static cmdret_t  _c_dcau(char mode, char * subject);
 static cmdret_t  _c_debug(int lvl);
 static cmdret_t  _c_glob(char * val);
@@ -174,7 +177,7 @@ static cmdret_t  _c_open(ch_t *, char *, char *, char *, int);
 static cmdret_t  _c_order(char * order);
 static cmdret_t  _c_parallel(int count);
 static cmdret_t  _c_passive();
-static cmdret_t  _c_pbsz(int count);
+static cmdret_t  _c_pbsz(long long length);
 static cmdret_t  _c_prot(char);
 static cmdret_t  _c_pget(ch_t*, ch_t*,globus_off_t, globus_off_t, char*, char*);
 static cmdret_t  _c_pwd(ch_t *);
@@ -190,18 +193,22 @@ static cmdret_t  _c_shell(char ** args);
 static cmdret_t  _c_size(ch_t *, char ** files);
 static cmdret_t  _c_stage(ch_t *, int rflag, int t, char ** files);
 static cmdret_t  _c_sunique();
-static cmdret_t  _c_tcpbuf(int size);
+static cmdret_t  _c_tcpbuf(long long size);
+#ifdef MSSFTP
 static cmdret_t  _c_type(char *);
+#endif /* MSSFTP */
 static cmdret_t  _c_versions();
 static cmdret_t  _c_wait();
+static cmdret_t  _c_link(ch_t *, char * oldfile, char * newfile);
+static cmdret_t  _c_symlink(ch_t *, char * oldfile, char * newfile);
 
 static errcode_t _c_get_ml(ch_t * ch, char * target, int type, ml_t ** mlp);
-static cmdret_t _c_xfer(ch_t * sch, 
-                        ch_t * dch, 
-                        int    rflag, 
-                        char * sfile, 
-                        char * dfile, 
-                        int    unique, 
+static cmdret_t _c_xfer(ch_t       * sch, 
+                        ch_t       * dch, 
+                        int          rflag, 
+                        char       * sfile, 
+                        char       * dfile, 
+                        int          unique, 
                         globus_off_t soff, 
                         globus_off_t slen);
 
@@ -252,7 +259,7 @@ static cmd_t gcmdlist [] = {
 "default and is faster than an ASCII transfer.\n",
 "binary\n", NULL},
 
-	{ _c_blksize, "blksize", C_A_OINT,
+	{ _c_blksize, "blksize", C_A_OLONG,
 "Change the size of the memory buffer used to read and write data to disks\n"
 "to <size> bytes. The default block size is 1024*1024 (1048576) bytes. The\n"
 "block size can be increased to improve file transfer performance. This is\n"
@@ -298,6 +305,11 @@ static cmd_t gcmdlist [] = {
 "cksum [on|off]\n",
 "on    Enable checksum comparison\n"
 "off   Disable checksum comparison\n"},
+
+	{ _c_cos, "cos", C_A_OSTRING,
+"Sets the class of service to [name] on the FTP service if the service\n"
+"supports it. If [name] is omitted, the current class of service is printed.\n",
+"cos [name]\n", NULL},
 
 	{ _c_close,    "close",  C_A_RCH_1|C_A_NOARGS,
 "Close the control connection to the remote host.\n",
@@ -426,6 +438,14 @@ static cmd_t gcmdlist [] = {
 "target  Directory or file to list. '.' is used by default.\n"
 "file    Write listing to [file].\n"},
 
+	{ _c_link, "link", C_A_RCH_1|C_A_2STRINGS,
+"Creates a hardlink to 'oldfile' on the remote service.\n",
+"link oldfile newfile\n", NULL},
+
+	{ _c_link, "llink", C_A_LCH_1|C_A_2STRINGS,
+"Creates a hardlink to 'oldfile' on the local service.\n",
+"llink oldfile newfile\n", NULL},
+
 	{ _c_list,  "lls", C_A_LCH_1|C_A_OPT_r|C_A_2OSTRINGS,
 "List the contents of the local target directory. If [target] is not given,\n"
 "then the current working directory is used.\n",
@@ -504,6 +524,10 @@ static cmd_t gcmdlist [] = {
 "seconds  number of seconds to attempt staging\n"
 "-r       Recursively stage all files in the given subdirectory.\n"},
 
+	{ _c_symlink, "lsymlink", C_A_LCH_1|C_A_2STRINGS,
+"Creates a symlink to 'oldfile' on the local service.\n",
+"lsymlink oldfile newfile\n", NULL},
+
 #ifdef MSSFTP
 	{ _c_rm,     "mdelete", C_A_RCH_1|C_A_OPT_r|C_A_STRINGS,
 "Alias for rm. This command has been deprecated.\n",
@@ -578,7 +602,7 @@ static cmd_t gcmdlist [] = {
 "firewall you must use PASSIVE mode.\n",
 "passive\n", NULL},
 
-	{ _c_pbsz,	"pbsz", C_A_OINT,
+	{ _c_pbsz,	"pbsz", C_A_OLONG,
 "Change the length of the protection buffer. The protection buffer is used\n"
 "to encrypt data on the data channel. The length of the protection buffer\n"
 "represents the largest encoded message that is allowed on the data channel.\n"
@@ -711,7 +735,11 @@ static cmd_t gcmdlist [] = {
 "Toggles the client to store files using unique names during put operations.\n",
 "sunique\n", NULL},
 
-	{ _c_tcpbuf, "tcpbuf", C_A_OINT,
+	{ _c_symlink, "symlink", C_A_RCH_1|C_A_2STRINGS,
+"Creates a symlink to 'oldfile' on the remote service.\n",
+"symlink oldfile newfile\n", NULL},
+
+	{ _c_tcpbuf, "tcpbuf", C_A_OLONG,
 "Set the data channel TCP buffer size to [size] bytes. If [size] is not\n"
 "given, the current TCP buffer size will be printed.\n",
 "tcpbuf [size]\n", NULL},
@@ -784,24 +812,24 @@ cmd_intrptr(char * cmd)
 static cmdret_t
 _c_lex(char * token)
 {
-	static int      state = C_A_CMD;
-	static int      dflag = 0;
-	static int      rflag = 0;
-	static int      rparg = 0;
-	static int      rParg = 0;
-	static int      ruarg = 0;
-	static cmd_t *  cmd   = NULL;
-	static char  *  parg  = NULL;
-	static char  *  uarg  = NULL;
-	static char  ** strs = NULL;
-	static char  *  str  = NULL;
-	static char     chr;
-	static int      perms = 0;
-	static int      Parg  = -1;
-	static int      scnt  = 0;
-	static int      ival  = -1;
-	static globus_off_t off = 0;
-	static globus_off_t len = -1;
+	static int          state = C_A_CMD;
+	static int          dflag = 0;
+	static int          rflag = 0;
+	static int          rparg = 0;
+	static int          rParg = 0;
+	static int          ruarg = 0;
+	static cmd_t     *  cmd   = NULL;
+	static char      *  parg  = NULL;
+	static char      *  uarg  = NULL;
+	static char      ** strs = NULL;
+	static char      *  str  = NULL;
+	static char         chr;
+	static int          perms = 0;
+	static int          Parg  = -1;
+	static int          scnt  = 0;
+	static int          ival  = -1;
+	static globus_off_t lval1 = -1;
+	static globus_off_t lval2 = -1;
 
 	cmdret_t cr    = CMD_SUCCESS;
 
@@ -849,6 +877,7 @@ _c_lex(char * token)
 		case C_A_OCHAR:
 		case C_A_NOARGS:
 		case C_A_OINT:
+		case C_A_OLONG:
 		case C_A_OSTRINGS:
 		case C_A_OSTRING:
 		case C_A_2OSTRINGS:
@@ -859,6 +888,9 @@ _c_lex(char * token)
 				break;
 			case C_A_OINT:
 				cr = ((cmdret_t (*)(int))cmd->func)(ival);
+				break;
+			case C_A_OLONG:
+				cr = ((cmdret_t (*)(long long))cmd->func)(lval1);
 				break;
 			case C_A_OPT_d|C_A_OSTRING:
 				cr = ((cmdret_t (*)(int, char *))cmd->func)(dflag, 
@@ -880,7 +912,6 @@ _c_lex(char * token)
 			case C_A_OSTRINGS:
 				cr = ((cmdret_t (*)(char**))cmd->func)(strs);
 				break;
-
 
 
 			case C_A_RCH_1|C_A_NOARGS:
@@ -990,7 +1021,7 @@ _c_lex(char * token)
 			case C_A_RCH_1|C_A_LCH_2|C_A_2OFF:
 				cr = ((cmdret_t (*)
 				  (ch_t*,ch_t*,globus_off_t,globus_off_t,char*,char*))
-				         cmd->func) (&grch,&glch,off,len,strs[0],strs[1]);
+				         cmd->func) (&grch,&glch,lval1,lval2,strs[0],strs[1]);
 				break;
 
 
@@ -1006,7 +1037,7 @@ _c_lex(char * token)
 			case C_A_LCH_1|C_A_RCH_2|C_A_2OFF:
 				cr = ((cmdret_t (*)
 				  (ch_t*,ch_t*,globus_off_t,globus_off_t,char*,char*))
-				         cmd->func) (&glch,&grch,off,len,strs[0],strs[1]);
+				         cmd->func) (&glch,&grch,lval1,lval2,strs[0],strs[1]);
 				break;
 
 			default:
@@ -1145,28 +1176,29 @@ notanoption:
 	case C_A_OINT:
 		if (!IsInt(token))
 		{
-			fprintf(stderr, "%s must be an integer.\n", token);
+			fprintf(stderr, "%s must be a positive integer.\n", token);
 			goto error;
 		}
 		ival = strtol(token, NULL, 0);
 		break;
 
 	case C_A_OFF:
-		if (!IsInt(token))
+		if (!IsLongWithTag(token))
 		{
-			fprintf(stderr, "%s must be an integer.\n", token);
+			fprintf(stderr, "%s must be a positive integer.\n", token);
 			goto error;
 		}
-		len = Strtoll(token, NULL, 0);
+		lval2 = ConvLongWithTag(token);
 		break;
 
+	case C_A_OLONG:
 	case C_A_2OFF:
-		if (!IsInt(token))
+		if (!IsLongWithTag(token))
 		{
-			fprintf(stderr, "%s must be an integer.\n", token);
+			fprintf(stderr, "%s must be a positive integer.\n", token);
 			goto error;
 		}
-		off = Strtoll(token, NULL, 0);
+		lval1 = ConvLongWithTag(token);
 		break;
 
 	case C_A_OSTRING:
@@ -1210,6 +1242,7 @@ notanoption:
 	case C_A_STRING:   /* 0x05 */
 	case C_A_OSTRING:  /* 0x08 */
 	case C_A_OCHAR:    /* 0x09 */
+	case C_A_OLONG:    /* 0x11 */
 		state = C_A_NOARGS;
 		break;
 	case C_A_STRINGS:  /* 0x03 */
@@ -1259,6 +1292,8 @@ cleanup:
 	FREE(parg);
 	FREE(uarg);
 
+	lval1 = -1;
+	lval2 = -1;
 	ival  = -1;
 	chr   = '\0';
 	cmd   = NULL;
@@ -1276,8 +1311,6 @@ cleanup:
 	strs  = NULL;
 	str   = NULL;
 	perms = 0;
-	off   = 0;
-	len   = -1;
 
 	return cr;
 }
@@ -1321,11 +1354,11 @@ _c_binary()
 }
 
 static cmdret_t
-_c_blksize(int size)
+_c_blksize(long long size)
 {
 	if (size != -1)
 		s_setblocksize(size);
-	o_printf(DEBUG_NORMAL, "Block size set to %d\n", s_blocksize());
+	o_printf(DEBUG_NORMAL, "Block size set to %lld\n", s_blocksize());
 	return CMD_SUCCESS;
 }
 
@@ -1644,6 +1677,19 @@ _c_cksum(char * val)
 }
 
 static cmdret_t
+_c_cos(char * cos)
+{
+	if (cos)
+		s_setcos(cos);
+
+	if (s_cos())
+		o_printf(DEBUG_NORMAL, "Class of service set to %s\n", s_cos());
+	else
+		o_printf(DEBUG_NORMAL, "Class of service set to the default.\n");
+	return CMD_SUCCESS;
+}
+
+static cmdret_t
 _c_dcau(char mode, char * subject)
 {
 	switch(mode)
@@ -1858,9 +1904,32 @@ _c_keepalive(int seconds)
 }
 
 static cmdret_t
+_c_link(ch_t * ch, char * oldfile, char * newfile)
+{
+	cmdret_t  cr = CMD_SUCCESS;
+	errcode_t ec = EC_SUCCESS;
+
+	/* Perform the link */
+	C_RETRY(ec, l_link(ch->lh, oldfile, newfile));
+
+	/* If an error occurred... */
+	if (ec != EC_SUCCESS)
+	{
+		/* Print the error msg. */
+		ec_print(ec);
+		/* Destroy the error code. */
+		ec_destroy(ec);
+		/* Indicate that a bad command was attmpted. */
+		cr = CMD_ERR_BAD_CMD;
+	}
+
+	return cr;
+}
+
+static cmdret_t
 _c_list(ch_t * ch, int rflag, char * path, char * ofile)
 {
-	cmdret_t   cr   = CMD_SUCCESS;
+	cmdret_t cr = CMD_SUCCESS;
 
 	if (rflag && !l_supports_list(ch->lh))
 	{
@@ -2201,14 +2270,14 @@ _c_passive()
 }
 
 static cmdret_t
-_c_pbsz(int len)
+_c_pbsz(long long length)
 {
-	if (len != -1)
-		s_setpbsz(len);
+	if (length != -1)
+		s_setpbsz(length);
 
 	if (s_pbsz())
 		o_printf(DEBUG_NORMAL, 
-	         "Using a %d byte protection buffer.\n", s_pbsz());
+	         "Using a %lld byte protection buffer.\n", s_pbsz());
 	else
 		o_printf(DEBUG_NORMAL, 
 	         "Using the default protection buffer length.\n");
@@ -2774,10 +2843,12 @@ _c_stage(ch_t * ch, int rflag, int t, char ** files)
 			}
 		}
 
+		/* Break if we have waited the requested length of time. */
 		if ((time(NULL) - start) > t)
 			break;
 
-		sleep((time(NULL) - start) > 15 ? 15 : (time(NULL)-start));
+		/* Sleep for a second before we try again. */
+		sleep(1);
 	}
 
 	for (ind = 0; ind < cnt; ind++)
@@ -2802,7 +2873,30 @@ _c_sunique()
 }
 
 static cmdret_t
-_c_tcpbuf(int size)
+_c_symlink(ch_t * ch, char * oldfile, char * newfile)
+{
+	cmdret_t  cr = CMD_SUCCESS;
+	errcode_t ec = EC_SUCCESS;
+
+	/* Perform the link */
+	C_RETRY(ec, l_symlink(ch->lh, oldfile, newfile));
+
+	/* If an error occurred... */
+	if (ec != EC_SUCCESS)
+	{
+		/* Print the error msg. */
+		ec_print(ec);
+		/* Destroy the error code. */
+		ec_destroy(ec);
+		/* Indicate that a bad command was attmpted. */
+		cr = CMD_ERR_BAD_CMD;
+	}
+
+	return cr;
+}
+
+static cmdret_t
+_c_tcpbuf(long long size)
 {
 	if (size != -1)
 		s_settcpbuf(size);
@@ -2812,11 +2906,12 @@ _c_tcpbuf(int size)
 	if (size == 0)
 		o_printf(DEBUG_NORMAL, "TCP buffer set to system default\n");
 	else
-		o_printf(DEBUG_NORMAL, "TCP buffer set to %d bytes\n", size);
+		o_printf(DEBUG_NORMAL, "TCP buffer set to %lld bytes\n", size);
 
 	return CMD_SUCCESS;
 }
 
+#ifdef MSSFTP
 static cmdret_t
 _c_type(char * type)
 {
@@ -2831,6 +2926,7 @@ _c_type(char * type)
 
 	return CMD_SUCCESS;
 }
+#endif /* MSSFTP */
 
 static cmdret_t
 _c_versions()
@@ -2906,16 +3002,47 @@ cleanup:
 }
 
 static cmdret_t
-_c_xfer(ch_t * sch, 
-        ch_t * dch, 
-        int    rflag, 
-        char * sfile, 
-        char * dfile, 
-        int    unique, 
+_c_utime(ch_t * Channel,
+         char * Target,
+         ml_t * Reference)
+{
+	errcode_t ec = EC_SUCCESS;
+	cmdret_t  cr = CMD_SUCCESS;
+
+	/*
+	 * Check that our reference has a valid time stamp.
+	 */
+	if (Reference->mf.Modify == 0)
+		return CMD_SUCCESS;
+
+	/*
+	 * Now update the timestamp. The underlying protocol may not
+	 * be capable but that is ok. I expect the underlying protocol to
+	 * just return success if it doesn't support it.
+	 */
+	C_RETRY(ec, l_utime(Channel->lh, Target, Reference->modify));
+	
+	if (ec)
+		cr = CMD_ERR_GET;
+
+	ec_print(ec);
+	ec_destroy(ec);
+
+	return cr;
+}
+
+static cmdret_t
+_c_xfer(ch_t       * sch, 
+        ch_t       * dch, 
+        int          rflag, 
+        char       * sfile, 
+        char       * dfile, 
+        int          unique, 
         globus_off_t soff, 
         globus_off_t slen)
 {
 	errcode_t ec     = EC_SUCCESS;
+	cmdret_t  lcr    = CMD_SUCCESS;
 	cmdret_t  cr     = CMD_SUCCESS;
 	fth_t   * sfth   = NULL; /* Source. */
 	fth_t   * dfth   = NULL; /* Destination. */
@@ -3112,8 +3239,16 @@ _c_xfer(ch_t * sch,
 		{
 		case 0:
 		case S_IFREG:
-			cr |= _c_xfer_file(sch, dch, smlp->name, target, unique, soff, slen);
+			lcr = _c_xfer_file(sch, dch, smlp->name, target, unique, soff, slen);
+
+			/* If the transfer was successful, update the timestamp. */
+			if (lcr == CMD_SUCCESS)
+				_c_utime(dch, target, smlp);
+
+			/* Update cr with any local error. */
+			cr |= lcr;
 			break;
+
 		case S_IFDIR:
 			dirs[0] = target;
 			dirs[1] = NULL;
@@ -3357,6 +3492,12 @@ cleanup:
 
 	if (cr == CMD_SUCCESS)
 	{
+#ifdef NOT
+		/*
+		 * I'm not sure under what circumstances 'total' would be zero given
+		 * the code above. But I do know it is breaking the report for
+		 *   pput 0 0 file
+		 */
 		if (total == 0)
 		{
 			if (slen != -1)
@@ -3373,16 +3514,16 @@ cleanup:
 			}
 			ec_destroy(ec);
 		}
+#endif /* NOT */
 		buf   = Sprintf(NULL, "%"GLOBUS_OFF_T_FORMAT" bytes", total);
 		tim   = Convtime(&start, &stop);
 		rate  = MkRate(&start, &stop, total);
 
 		o_fprintf(stdout,
 		          DEBUG_NORMAL,
-		          "%s: %s%s%s%s%s%s\n",
+		          "%s: %s in %s%s%s%s\n",
 		          *src == '|' ? dst : src,
-		          total ? buf : "",
-		          total ?  " in " : "",
+		          buf,
 		          tim,
 		          rate  ? " ("  : "",
 		          rate  ? rate : "",

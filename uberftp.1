@@ -116,11 +116,14 @@ Set the internal buffer size to \fIn\fR.
 .B \-cksum [\fIon\fR|\fIoff\fR]
 Enable/Disable CRC checks after file transfers.
 .TP
+.B \-cos \fIname\fR
+Set the storage class of service to \fIname\fR. Used with HPSS installations.
+.TP
 .B \-debug \fIn\fR
 Set the debug level to \fIn\fR.
 .TP
 .B \-family \fIname\fR
-Set the remote storage family to \fIname\fR.
+Set the storage family to \fIname\fR.
 .TP
 .B \-glob [\fIon\fR|\fIoff\fR]
 Enable/Disable filename expansion.
@@ -185,6 +188,9 @@ Set the permissions of the remote object(s).
 .B \-dir [\fI-r\fR] \fIurl\fR
 List the contents of the remote object.
 .TP
+.B \-link \fIurl\fR \fIpath\fR
+Create a hardlink named <path> to the remote object.
+.TP
 .B \-ls [\fI-r\fR] \fIurl\fR
 List the contents of the remote object.
 .TP
@@ -206,6 +212,9 @@ Return the size of the remote object.
 .B \-stage [\fI-r\fR] \fIseconds\fR \fIurl\fR
 Attempt to stage the remote object(s) over the time
 period given in seconds.
+.TP
+.B \-symlink \fIurl\fR \fIpath\fR
+Create a symlink named <path> to the remote object.
 
 .SH DEFAULT TRANSFER MODE
 .LP
@@ -308,6 +317,10 @@ NCSA's mass storage system.
 .br
 \fIoff\fR   Disable checksum comparison
 .TP
+.B cos \fIname\fR
+Sets the HPSS class of service to \fIname\fR on the FTP service if the service
+supports it. If \fIname\fR is omitted, the current class of service is printed.
+.TP
 .B dcau [\fIN\fR|\fIA\fR|\fIS\fR \fIsubject\fR]
 Change the data channel authentication settings. If the service does not
 support DCAU, these settings are ignored.
@@ -409,6 +422,12 @@ then the current working directory is used.
 .br
 target  Directory or file to list. '.' is used by default.
 .TP
+.B link [\fIoldfile\fR] [\fInewfile\fR]
+Create a hardlink to oldfile named newfile on the remote service.
+.TP
+.B llink [\fIoldfile\fR] [\fInewfile\fR]
+Create a hardlink to oldfile named newfile on the local service.
+.TP
 .B lls [\fI-r\fR] [\fItarget\fR]
 List the contents of the local \fItarget\fR directory. If \fItarget\fR is not given,
 then the current working directory is used.
@@ -478,6 +497,9 @@ on the local service.
 seconds  number of seconds to attempt staging
 .br
 \fI-r\fR       Recursively stage all files in the given subdirectory.
+.TP
+.B lsymlink [\fIoldfile\fR] [\fInewfile\fR]
+Create a symlink to oldfile named newfile on the local service.
 .TP
 .B mput [\fI-r\fR] \fIobject1\fR [\fIobject2\fR...\fIobjectn\fR]
 Retrieve file(s) from the remote service. This is similiar to making
@@ -671,6 +693,9 @@ on the remote service.
 .TP
 .B sunique
 Toggles the client to store files using unique names during get operations.
+.TP
+.B symlink [\fIoldfile\fR] [\fInewfile\fR]
+Create a symlink to oldfile named newfile on the remote service.
 .TP
 .B tcpbuf [\fIsize\fR]
 Set the data channel TCP buffer size to \fIsize\fR bytes. If \fIsize\fR is not

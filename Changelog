@@ -1,3 +1,27 @@
+Version 2.7 03/28/12
+	- Added a patch from Craig Tierney of NOAA to allow file size suffixes
+	  'K', 'M', 'G' and 'T' so that values can be converted to kibibytes,
+	  mebibytes, gibibytes and tebibytes, respectively. The chance has been
+	  added to the command blksize, pbsz, tcpbuf, pput and pget.
+	- Fixed byte transfer rate reporting after files are transferred but
+	  zero bytes are actually transferred, as in 'pput 0 0 file'.
+	- Fixed hang in extended mode retrieves
+	- Added fix for globbing when using Globus GridFTP server 6.0 from
+	  Globus Toolkit 5.1.2
+	- Added support for 'SITE SETFAM'
+	- Added support for 'SITE STAGE'
+	- Added new interactive commands link, llink, symlink and lsymlink and
+	  added -link and -symlink to the command line. Not supported by all
+	  GridFTP servers. Symlink requires Globus 5.2.x.
+	- Fixed how long the stage command will wait before retries
+	- Changed MLSx processing of owner/group to use uid/gid when
+	  owner/group equals '(null)'.
+	- Now tries to maintain modification timestamps if the server supports it.
+	  This is only supported on files.
+	- Added 'cos' command (interactive and commandline) for setting the
+	  class of service (used with HPSS installations).
+	- Fixed build against Globus 5.2.x
+
 Version 2.6 8/5/10
 	- Fixed a segfault found on a UV10 running SLES11. The crash occurs
 	  when the client tries to print out the server MOTD and the MOTD

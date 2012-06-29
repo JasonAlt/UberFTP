@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -39,11 +39,13 @@
  * DEALINGS WITH THE SOFTWARE.
  */
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <fnmatch.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "linterface.h"
 #include "settings.h"
@@ -92,12 +94,14 @@ typedef struct ftp_handle {
 	/* Supported Features */
 	int hasChgrp;
 	int hasDcau;
-	int hasCksum;
+	int hasSiteSum;
 	int hasParallel;
 	int hasMlst;
 	int hasEsto;
 	int hasEret;
-	int hasFamily;
+	int hasSetfam;
+	int hasSiteSetfam;
+	int hasSiteSetCos;
 	int hasPasv;
 	int hasAllo;
 	int hasSize;
@@ -105,6 +109,9 @@ typedef struct ftp_handle {
 	int hasSbuf;
 	int hasSiteBufsize;
 	int hasStage;
+	int hasSiteStage;
+	int hasMFMT;
+	int hasSiteUtime;
 
 	/* Mlsx features */
 	mf_t mf;
@@ -255,16 +262,21 @@ ftp_connect(pd_t *  pd,
 		goto cleanup;
 
 	/* Set the default features. */
-    fh->hasChgrp  = 1;
-    fh->hasFamily = 1;
-    fh->hasCksum  = 1;
-    fh->hasPasv   = 1;
-    fh->hasAllo   = 1;
-    fh->hasSize   = 1;
-    fh->hasWind   = 1;
-    fh->hasSbuf   = 1;
+    fh->hasChgrp       = 1;
+    fh->hasSetfam      = 1;
+    fh->hasSiteSetfam  = 1;
+	fh->hasSiteSetCos  = 1;
+    fh->hasSiteSum     = 1;
+    fh->hasPasv        = 1;
+    fh->hasAllo        = 1;
+    fh->hasSize        = 1;
+    fh->hasWind        = 1;
+    fh->hasSbuf        = 1;
     fh->hasSiteBufsize = 1;
-    fh->hasStage   = 1;
+    fh->hasStage       = 1;
+    fh->hasSiteStage   = 1;
+    fh->hasMFMT        = 1;
+    fh->hasSiteUtime   = 1;
 
 	/* Now grab the feature set, if available. */
 	ec = _f_send_cmd(fh, "FEAT");
@@ -430,7 +442,7 @@ ftp_retr(pd_t * pd,
 			return ec;
 
 		ec = _f_get_final_resp(fh, &code, &resp);
-		if (!ec)
+		if (ec)
 			return ec;
 
 		if (!F_CODE_SUCC(code))
@@ -514,35 +526,132 @@ ftp_stor(pd_t * pd,
 	}
 
 	/* Set family. */
-	if (fh->hasFamily && s_family())
+	if (s_family())
 	{
-		cmd = Sprintf(NULL, "SETFAM %s", s_family());
-		ec  = _f_send_cmd(fh, cmd);
-		FREE(cmd);
-		if (ec)
-			return ec;
+		while (fh->hasSetfam || fh->hasSiteSetfam)
+		{
+			/* Construct the command */
+			if (fh->hasSetfam)
+				cmd = Sprintf(NULL, "SETFAM %s", s_family());
+			else /* fh->hasSiteSetfam */
+				cmd = Sprintf(NULL, "SITE SETFAM %s", s_family());
 
-		ec = _f_get_final_resp(fh, &code, &resp);
-		if (ec)
-			return ec;
+			/* Send the command */
+			ec  = _f_send_cmd(fh, cmd);
 
-		if (F_CODE_UNKNOWN(code))
-			fh->hasFamily = 0;
-		else if (!F_CODE_SUCC(code))
-			ec = ec_create(EC_GSI_SUCCESS,
-			               EC_GSI_SUCCESS,
-			               "Failed to setup desired family:\n%s",
-			               resp);
-		FREE(resp);
-		if (ec)
-			return ec;
+			/* Release the command before we return an error. */
+			FREE(cmd);
+
+			/* Check error status. */
+			if (ec)
+				return ec;
+
+			/* Get the response. */
+			ec = _f_get_final_resp(fh, &code, &resp);
+			if (ec)
+				return ec;
+
+			/* If the server didn't recognize the command... */
+			if (F_CODE_UNKNOWN(code))
+			{
+				/* Make sure we check these in the same order. */
+				if (fh->hasSetfam)
+					fh->hasSetfam = 0;
+				else
+					fh->hasSiteSetfam = 0;
+
+				/* Free the response. */
+				FREE(resp);
+
+				/* Start over. */
+				continue;
+			}
+
+			/* If an error of some sort occurred... */
+			if (!F_CODE_SUCC(code))
+			{
+				/* Create the error code. */
+				ec = ec_create(EC_GSI_SUCCESS,
+				               EC_GSI_SUCCESS,
+				               "Failed to set the desired family:\n%s",
+				               resp);
+
+				/* Free the response. */
+				FREE(resp);
+
+				/* Return the error. */
+				return ec;
+			}
+
+			/*
+			 * Success!
+			 */
+
+			/* Free the response. */
+			FREE(resp);
+
+			/* Break out of the loop. */
+			break;
+		}
 	}
 
-	/* Send ALLO */
-	if (fh->hasAllo)
+	/* Set class of service. */
+	if (s_cos())
 	{
+		if (fh->hasSiteSetCos)
+		{
+			cmd = Sprintf(NULL, "SITE SETCOS %s", s_cos());
+
+			/* Send the command */
+			ec  = _f_send_cmd(fh, cmd);
+
+			/* Release the command before we return an error. */
+			FREE(cmd);
+
+			/* Check error status. */
+			if (ec)
+				return ec;
+
+			/* Get the response. */
+			ec = _f_get_final_resp(fh, &code, &resp);
+			if (ec)
+				return ec;
+
+			/* If the server didn't recognize the command... */
+			if (F_CODE_UNKNOWN(code))
+			{
+				fh->hasSiteSetCos = 0;
+
+				/* Free the response. */
+				FREE(resp);
+			}
+
+			/* If an error of some sort occurred... */
+			else if (!F_CODE_SUCC(code))
+			{
+				/* Create the error code. */
+				ec = ec_create(EC_GSI_SUCCESS,
+				               EC_GSI_SUCCESS,
+				               "Failed to set the desired family:\n%s",
+				               resp);
+
+				/* Free the response. */
+				FREE(resp);
+
+				/* Return the error. */
+				return ec;
+			}
+
+			/*
+			 * Success!
+			 */
+
+			/* Free the response. */
+			FREE(resp);
+		}
 	}
 
+	/* Prepare the data channel. */
 	ec = _f_prep_dc(fh, 
 	                ofh, 
 	                0, 
@@ -1172,7 +1281,7 @@ ftp_quote(pd_t * pd, char * cmd, char ** resp)
 	if ((token = StrtokEsc(cptr, ' ', &next)))
 	{
 		/* Wait */
-		if (strcasecmp(token, "wait") == 0)
+		if (strcasecmp(token, "WAIT") == 0)
 		{
 			if (!StrtokEsc(next, ' ', &next))
 			{
@@ -1186,12 +1295,12 @@ ftp_quote(pd_t * pd, char * cmd, char ** resp)
 		}
 
 		/* Site Commands. */
-		if (strcasecmp(token, "site") == 0)
+		if (strcasecmp(token, "SITE") == 0)
 		{
 			if ((token = StrtokEsc(next, ' ', &next)))
 			{
 				/* Wait */
-				if (strcasecmp(token, "wait") == 0)
+				if (strcasecmp(token, "WAIT") == 0)
 				{
 					if (!StrtokEsc(next, ' ', &next))
 					{
@@ -1222,7 +1331,7 @@ send_cmd:
 	cptr = Strdup(cmd);
 	if ((token = StrtokEsc(cptr, ' ', &next)))
 	{
-		if (strcasecmp(token, "setfam") == 0)
+		if (strcasecmp(token, "SETFAM") == 0)
 		{
 			if (strlen(next) > 0)
 			{
@@ -1244,11 +1353,11 @@ send_cmd:
 		}
 	
 		/* Site Commands. */
-		if (strcasecmp(token, "site") == 0)
+		if (strcasecmp(token, "SITE") == 0)
 		{
 			if ((token = StrtokEsc(next, ' ', &next)))
 			{
-				if (strcasecmp(token, "setfam") == 0)
+				if (strcasecmp(token, "SETFAM") == 0)
 				{
 					if (strlen(next) > 0)
 					{
@@ -1268,6 +1377,31 @@ send_cmd:
 							*resp = Sprintf(NULL, 
 							                "Family set to %s\n", 
 							                s_family());
+						}
+					}
+					goto cleanup;
+				}
+
+				if (strcasecmp(token, "SETCOS") == 0)
+				{
+					if (strlen(next) > 0)
+					{
+						if (F_CODE_SUCC(code))
+						{
+							s_setcos(next);
+							FREE(*resp);
+							*resp = Sprintf(NULL, 
+							                "Class of service set to %s.\r\n", 
+							                s_cos());
+						}
+					} else
+					{
+						if (s_cos() && F_CODE_SUCC(code))
+						{
+							FREE(*resp);
+							*resp = Sprintf(NULL, 
+							                "Class of service set to %s\n", 
+							                s_cos());
 						}
 					}
 					goto cleanup;
@@ -1497,6 +1631,7 @@ ftp_stage(pd_t * pd, char * file, int * staged)
 	char    * resp = NULL;
 	int       code = 0;
 
+	/* Assume it is not staged. */
 	*staged = 0;
 
 	/* Reconnect */
@@ -1504,36 +1639,79 @@ ftp_stage(pd_t * pd, char * file, int * staged)
 	if (ec)
 		return ec;
 
-	cmd = Sprintf(NULL, "STAGE 0 %s", file);
-	if (fh->hasStage)
-		ec = _f_send_cmd(fh, cmd);
-	FREE(cmd);
-
-	if(ec)
-		return ec;
-
-	ec = _f_get_final_resp(fh, &code, &resp);
-	if (ec)
-		return ec;
-
-	if (F_CODE_SUCC(code) || !code)
-		*staged = 1;
-
-	if (F_CODE_FINAL_ERR(code))
+	while (fh->hasStage || fh->hasSiteStage)
 	{
+		/* Create the command. */
+		if (fh->hasStage)
+			cmd = Sprintf(NULL, "STAGE 0 %s", file);
+		else /* fh->hasSiteStage */
+			cmd = Sprintf(NULL, "SITE STAGE 0 %s", file);
+
+		/* Send the command. */
+		ec = _f_send_cmd(fh, cmd);
+
+		/* Free the command before we return on error. */
+		FREE(cmd);
+
+		/* Return on error. */
+		if (ec)
+			return ec;
+
+		/* Get the final response. */
+		ec = _f_get_final_resp(fh, &code, &resp);
+		if (ec)
+			return ec;
+
+		/* If the server didn't recognize the command... */
 		if (F_CODE_UNKNOWN(code))
 		{
-			fh->hasStage = 0;
-			*staged = 1;
-		} else /* (!F_CODE_UNKNOWN(code)) */
+			/* Make sure we check in the same order. */
+			if (fh->hasStage)
+				fh->hasStage = 0;
+			else /* fh->hasSiteStage */
+				fh->hasSiteStage = 0;
+
+			/* Free the response. */
+			FREE(resp);
+
+			/* Try again. */
+			continue;
+		}
+
+		/* If the server returned an error... */
+		if (F_CODE_FINAL_ERR(code))
+		{
+			/* Construct the error code. */
 			ec = ec_create(EC_GSI_SUCCESS,
 			               EC_GSI_SUCCESS,
 			               "%s: %s",
 			               file,
 			               resp);
+
+			/* Free the response. */
+			FREE(resp);
+
+			/* Return the error */
+			return ec;
+		}
+
+		/* If we received a success code, indicate that the file has staged. */
+		if (F_CODE_SUCC(code) || !code)
+			*staged = 1;
+
+		/* Done. */
+		break;
 	}
-	FREE(resp);
-	return ec;
+
+	/* If neither stage command works... */
+	if (!fh->hasStage && !fh->hasSiteStage)
+	{
+		/* Just say it staged. */
+		*staged = 1;
+	}
+
+	/* Return success */
+	return EC_SUCCESS;
 }
 
 errcode_t
@@ -1547,7 +1725,7 @@ ftp_cksum (pd_t * pd, char * file, int * supported, unsigned int * crc)
 	int       code = 0;
 	int       ret  = 0;
 
-	if (!fh->hasCksum)
+	if (!fh->hasSiteSum)
 	{
 		*supported = 0;
 		return ec;
@@ -1558,7 +1736,7 @@ ftp_cksum (pd_t * pd, char * file, int * supported, unsigned int * crc)
 	if (ec)
 		return ec;
 
-	cmd = Sprintf(NULL, "site sum %s", file);
+	cmd = Sprintf(NULL, "SITE SUM %s", file);
 	ec = _f_send_cmd(fh, cmd);
 	FREE(cmd);
 	if(ec)
@@ -1586,7 +1764,7 @@ ftp_cksum (pd_t * pd, char * file, int * supported, unsigned int * crc)
 	{
 		if (F_CODE_UNKNOWN(code))
 		{
-			fh->hasCksum = 0;
+			fh->hasSiteSum = 0;
 			*supported   = 0;
 		} else /* (!F_CODE_UNKNOWN(code)) */
 		{
@@ -1601,6 +1779,330 @@ ftp_cksum (pd_t * pd, char * file, int * supported, unsigned int * crc)
 	}
 	FREE(resp);
 	return ec;
+}
+
+errcode_t
+ftp_link (pd_t * pd, char * oldfile, char * newfile)
+{
+	errcode_t ec   = EC_SUCCESS;
+	fh_t    * fh   = (fh_t *) pd->ftppriv;
+	char    * cmd  = NULL;
+	char    * resp = NULL;
+	int       code = 0;
+
+	/* Reconnect */
+	ec = _f_reconnect(fh);
+	if (ec)
+		return ec;
+
+	/* Construct the command. */
+	cmd = Sprintf(NULL, "SITE HLN %s %s", oldfile, newfile);
+
+	/* Send the command. */
+	ec = _f_send_cmd(fh, cmd);
+
+	/* Free the command before we return any errors. */
+	FREE(cmd);
+
+	/* If we receive an error, return it. */
+	if (ec)
+		return ec;
+
+	/* Get the final response. */
+	ec = _f_get_final_resp(fh, &code, &resp);
+	if (ec)
+		return ec;
+
+	/* 100-199 or 300-399 */
+	if (F_CODE_CONT(code) || F_CODE_INTR(code))
+	{
+		/* Create the error code. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Unexpected response to HLN: %s",
+		               resp);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* 400-599 */
+	if (F_CODE_ERR(code))
+	{
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "%s",
+		               resp);
+
+		/* 400-499 */
+		if (F_CODE_TRANS_ERR(code))
+			ec_set_flag(ec, EC_FLAG_CAN_RETRY);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* Free the response. */
+	FREE(resp);
+
+	/* Success! */
+	return EC_SUCCESS;
+}
+
+errcode_t
+ftp_symlink (pd_t * pd, char * oldfile, char * newfile)
+{
+	errcode_t ec   = EC_SUCCESS;
+	fh_t    * fh   = (fh_t *) pd->ftppriv;
+	char    * cmd  = NULL;
+	char    * resp = NULL;
+	int       code = 0;
+
+	/* Reconnect */
+	ec = _f_reconnect(fh);
+	if (ec)
+		return ec;
+
+	/* Construct the command. */
+	cmd = Sprintf(NULL, "SITE SYMLINKFROM %s", oldfile);
+
+	/* Send the command. */
+	ec = _f_send_cmd(fh, cmd);
+
+	/* Free the command before we return any errors. */
+	FREE(cmd);
+
+	/* If we receive an error, return it. */
+	if (ec)
+		return ec;
+
+	/* Get the final response. */
+	ec = _f_get_final_resp(fh, &code, &resp);
+	if (ec)
+		return ec;
+
+	/* 400-599 */
+	if (F_CODE_ERR(code))
+	{
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "%s",
+		               resp);
+
+		/* 400-499 */
+		if (F_CODE_TRANS_ERR(code))
+			ec_set_flag(ec, EC_FLAG_CAN_RETRY);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* We should get code=350 */
+	if (!F_CODE_INTR(code))
+	{
+		/* Create the error code. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Unexpected response to SYMLINKFROM: %s",
+		               resp);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* Free the response. */
+	FREE(resp);
+
+	/* Construct the command. */
+	cmd = Sprintf(NULL, "SITE SYMLINKTO %s", newfile);
+
+	/* Send the command. */
+	ec = _f_send_cmd(fh, cmd);
+
+	/* Free the command before we return any errors. */
+	FREE(cmd);
+
+	/* If we receive an error, return it. */
+	if (ec)
+		return ec;
+
+	/* Get the final response. */
+	ec = _f_get_final_resp(fh, &code, &resp);
+	if (ec)
+		return ec;
+
+	/* Handle an error message. */
+	if (F_CODE_ERR(code))
+	{
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "%s",
+		               resp);
+
+		/* 400-499 */
+		if (F_CODE_TRANS_ERR(code))
+			ec_set_flag(ec, EC_FLAG_CAN_RETRY);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* We should have received success */
+	if (!F_CODE_SUCC(code))
+	{
+		/* Create the error code. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Unexpected response to SYMLINKFROM: %s",
+		               resp);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* Free the response. */
+	FREE(resp);
+
+	/* Success! */
+	return EC_SUCCESS;
+}
+
+errcode_t
+ftp_utime (pd_t * pd, char * path, time_t timestamp)
+{
+	errcode_t ec   = EC_SUCCESS;
+	fh_t    * fh   = (fh_t *) pd->ftppriv;
+	char    * cmd  = NULL;
+	char    * resp = NULL;
+	int       code = 0;
+	struct tm tm;
+
+	/* Bail if never command exists. */
+	if (!fh->hasMFMT && !fh->hasSiteUtime)
+		return EC_SUCCESS;
+
+	/* Reconnect */
+	ec = _f_reconnect(fh);
+	if (ec)
+		return ec;
+
+	/* Convert the modification time. */
+	/* localtime_r(&timestamp, &tm); */
+	gmtime_r(&timestamp, &tm);
+
+	/* Construct the command. */
+	if (fh->hasMFMT)
+	{
+		cmd = Sprintf(NULL, 
+		              "MFMT %.4d%.2d%.2d%.2d%.2d%.2d %s", 
+		              tm.tm_year + 1900,
+		              tm.tm_mon  + 1,
+		              tm.tm_mday,
+		              tm.tm_hour,
+		              tm.tm_min,
+		              tm.tm_sec,
+		              path);
+	} else /* SITE UTIME */
+	{
+		cmd = Sprintf(NULL, 
+		              "SITE UTIME %.4d%.2d%.2d%.2d%.2d%.2d %s", 
+		              tm.tm_year + 1900,
+		              tm.tm_mon  + 1,
+		              tm.tm_mday,
+		              tm.tm_hour,
+		              tm.tm_min,
+		              tm.tm_sec,
+		              path);
+	}
+
+	/* Send the command. */
+	ec = _f_send_cmd(fh, cmd);
+
+	/* Free the command before we return any errors. */
+	FREE(cmd);
+
+	/* If we receive an error, return it. */
+	if (ec)
+		return ec;
+
+	/* Get the final response. */
+	ec = _f_get_final_resp(fh, &code, &resp);
+	if (ec)
+		return ec;
+
+	/* Check if it didn't understand the command. */
+	if (F_CODE_UNKNOWN(code))
+	{
+		if (fh->hasMFMT)
+			fh->hasMFMT = 0;
+		else
+			fh->hasSiteUtime = 0;
+
+		FREE(resp);
+
+		/* Try again. */
+		return ftp_utime (pd, path, timestamp);
+	}
+
+	/* 400-599 */
+	if (F_CODE_ERR(code))
+	{
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Error while updating timestamps on %s",
+		               path,
+		               resp);
+
+			/* 400-499 */
+		if (F_CODE_TRANS_ERR(code))
+			ec_set_flag(ec, EC_FLAG_CAN_RETRY);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* We should have a success code. */
+	if (!F_CODE_SUCC(code))
+	{
+		/* Create the error code. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Unexpected response when setting timestamp: %s",
+		               resp);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* Free the response. */
+	FREE(resp);
+
+	/* Success! */
+	return EC_SUCCESS;
 }
 
 #ifdef SYSLOG_PERF
@@ -1639,6 +2141,9 @@ const Linterface_t FtpInterface = {
 	ftp_expand_tilde,
 	ftp_stage,
 	ftp_cksum,
+	ftp_link,
+	ftp_symlink,
+	ftp_utime,
 #ifdef SYSLOG_PERF
 	ftp_rhost,
 #endif /* SYSLOG_PERF */
@@ -2571,6 +3076,14 @@ _f_mlsx(char * str, ml_t * ml)
 	while((token = strtok_r(cptr, ";", &lasts)) != NULL)
 	{
 		cptr = NULL;
+
+		/*
+		 * Remove any leading space. There should only be one space per line
+		 * in the MLST output and that should be taken care of by our caller
+		 * but this will work around any misformed server responses.
+		 */
+		while (isspace(*token)) token++;
+
 		if (strncasecmp(token, "type=", 5) == 0)
 		{
 			if (strcasecmp(token+5, "file") == 0)
@@ -2648,12 +3161,54 @@ _f_mlsx(char * str, ml_t * ml)
 			ml->mf.UNIX_mode = 1;
 		} else if (strncasecmp(token, "UNIX.owner=", 11) == 0)
 		{
-			ml->UNIX_owner = Strdup(token+11);
-			ml->mf.UNIX_owner = 1;
+			/*
+			 * UNIX_owner may hold the uid, don't overwrite it if 
+			 * token+11 is '(null)'.
+			 */
+			if (ml->UNIX_owner == NULL || strcmp(token+11, "(null)") != 0)
+			{
+				if (ml->UNIX_owner != NULL)
+					FREE(ml->UNIX_owner);
+
+				ml->UNIX_owner = Strdup(token+11);
+				ml->mf.UNIX_owner = 1;
+			}
+		} else if (strncasecmp(token, "UNIX.uid=", 9) == 0)
+		{
+			/* Don't overwrite the owner unless it is '(null)' */
+			if (ml->UNIX_owner == NULL || strcmp(ml->UNIX_owner, "(null)") == 0)
+			{
+				if (ml->UNIX_owner != NULL)
+					FREE(ml->UNIX_owner);
+
+				ml->UNIX_owner = Strdup(token+9);
+				ml->mf.UNIX_owner = 1;
+			}
 		} else if (strncasecmp(token, "UNIX.group=", 11) == 0)
 		{
-			ml->UNIX_group = Strdup(token+11);
-			ml->mf.UNIX_group = 1;
+			/*
+			 * UNIX_group may hold the gid, don't overwrite it if 
+			 * token+11 is '(null)'.
+			 */
+			if (ml->UNIX_group == NULL || strcmp(token+11, "(null)") != 0)
+			{
+				if (ml->UNIX_group != NULL)
+					FREE(ml->UNIX_group);
+
+				ml->UNIX_group = Strdup(token+11);
+				ml->mf.UNIX_group = 1;
+			}
+		} else if (strncasecmp(token, "UNIX.gid=", 9) == 0)
+		{
+			/* Don't overwrite the group unless it is '(null)' */
+			if (ml->UNIX_group == NULL || strcmp(ml->UNIX_group, "(null)") == 0)
+			{
+				if (ml->UNIX_group != NULL)
+					FREE(ml->UNIX_group);
+
+				ml->UNIX_group = Strdup(token+9);
+				ml->mf.UNIX_group = 1;
+			}
 		} else if (strncasecmp(token, "unique=", 7) == 0)
 		{
 			ml->unique = Strdup(token+7);

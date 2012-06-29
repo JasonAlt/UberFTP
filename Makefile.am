@@ -59,16 +59,18 @@ Sources= \
 	ml.h       cksum.c      cksum.h       perf.c     perf.h
 
 uberftp_SOURCES=$(Sources)
-uberftp_LDFLAGS=@LDFLAGS@ @GLOBUS_LDFLAGS@
-uberftp_LDADD=@LIBS@ @GLOBUS_LIBS@
-uberftp_CFLAGS=@CFLAGS@ @GLOBUS_CFLAGS@ -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGE_FILES
+uberftp_LDFLAGS=@GLOBUS_LDFLAGS@
+uberftp_LDADD=@GLOBUS_PKG_LIBS@
+# This hack is in until I can figure out why globus_makefile_header in
+# 5.2.x does not return include/globus/<flavor>/
+uberftp_CFLAGS=@GLOBUS_CFLAGS@ @GLOBUS_INCLUDES@ -I@GLOBUS_LOCATION@/include/globus/@GLOBUS_FLAVOR_NAME@
 bin_PROGRAMS=uberftp
 man_MANS=uberftp.1
 
 #cmds2man_SOURCES=$(Sources)
-#cmds2man_LDFLAGS=@LDFLAGS@ @GLOBUS_LDFLAGS@
-#cmds2man_LDADD=@LIBS@ @GLOBUS_LIBS@
-#cmds2man_CFLAGS=@CFLAGS@ @GLOBUS_CFLAGS@ -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGE_FILES -DCMDS2MAN
+#cmds2man_LDFLAGS=@GLOBUS_LDFLAGS@
+#cmds2man_LDADD=@GLOBUS_LIBS@
+#cmds2man_CFLAGS=@GLOBUS_CFLAGS@
 
 srcpkg: distdir
 	-cp pkg_data_src.gpt $(distdir)

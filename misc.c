@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -520,6 +520,57 @@ Strcasestr(char * str, char * pattern)
 	}
 
 	return NULL;
+}
+
+int
+IsLongWithTag(char * str)
+{
+	int pos = 0;
+	int len = 0;
+
+	if (!str)
+		return 0;
+
+	len = strlen(str);
+
+	for (pos = 0; pos < (len - 1); pos++)
+	{
+		if (!isdigit(str[pos]))
+			return 0;
+	}
+
+	if (isdigit(str[pos]) ||
+	   (toupper(str[pos]) == 'K') ||
+	   (toupper(str[pos]) == 'M') ||
+	   (toupper(str[pos]) == 'G') ||
+	   (toupper(str[pos]) == 'T'))
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+long long
+ConvLongWithTag(char * str)
+{
+	long long  value = 0;
+	int        slen  = 0;
+	int        c     = 0;
+
+	if (!str)
+		return 0;
+
+	value = strtoll(str, NULL, 0);
+	slen  = strlen(str);
+	c     = toupper(str[slen-1]);
+
+	if (c == 'K') return value * 1024;
+	if (c == 'M') return value * 1024 * 1024;
+	if (c == 'G') return value * 1024 * 1024 * 1024;
+	if (c == 'T') return value * 1024 * 1024 * 1024 * 1024;
+
+	return value;
 }
 
 int

@@ -26,16 +26,16 @@
 #define PACKAGE_BUGREPORT "Jason Alt <jalt@ncsa.uiuc.edu>"
 
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "UberFTP"
+#define PACKAGE_NAME "UberFTP (2.7 BETA 3)"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "UberFTP 2.6"
+#define PACKAGE_STRING "UberFTP (2.7 BETA 3) 2.7_BETA_3"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "uberftp-client"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.6"
+#define PACKAGE_VERSION "2.7_BETA_3"
 
 /* Version number of package */
-#define VERSION "2.6"
+#define VERSION "2.7_BETA_3"

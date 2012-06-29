@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -72,6 +72,33 @@ struct network_handle_t
 
 static errcode_t _net_wait_ready(nh_t * nh, int read, int write, int except);
 
+static errcode_t
+_net_set_nonblocking(int fd)
+{
+	int rval  = 0;
+	int flags = 0;
+
+	flags = fcntl(fd, F_GETFL, 0);
+	if (flags < 0)
+	{
+		return ec_create(EC_GSI_SUCCESS,
+		                 EC_GSI_SUCCESS,
+		                 "Failed to get socket flags: %s",
+		                 strerror(errno));
+	}
+
+	rval = fcntl(fd, F_SETFL, flags|O_NONBLOCK);
+	if (rval < 0)
+	{
+		return ec_create(EC_GSI_SUCCESS,
+		                 EC_GSI_SUCCESS,
+		                 "Failed to set O_NONBLOCK on socket : %s",
+		                 strerror(errno));
+	}
+
+	return EC_SUCCESS;
+}
+
 int
 net_connected(nh_t * nh)
 {
@@ -91,7 +118,6 @@ errcode_t
 net_connect(nh_t ** nhp,  struct sockaddr_in * sin)
 {
 	int             rval   = 0;
-	int             flags  = 0;
 	int             wsize  = 0;
 	nh_t          * nh     = NULL;
 	errcode_t       ec     = EC_SUCCESS;
@@ -131,25 +157,9 @@ net_connect(nh_t ** nhp,  struct sockaddr_in * sin)
 
 	}
 
-	flags = fcntl(nh->fd, F_GETFL, 0);
-	if (flags < 0)
-	{
-		ec = ec_create(EC_GSI_SUCCESS,
-		               EC_GSI_SUCCESS,
-		               "Failed to get socket flags: %s",
-		               strerror(errno));
+	ec = _net_set_nonblocking(nh->fd);
+	if (ec != EC_SUCCESS)
 		goto cleanup;
-	}
-
-	rval = fcntl(nh->fd, F_SETFL, flags|O_NONBLOCK);
-	if (rval < 0)
-	{
-		ec = ec_create(EC_GSI_SUCCESS,
-		               EC_GSI_SUCCESS,
-		               "Failed to set O_NONBLOCK on socket : %s",
-		               strerror(errno));
-		goto cleanup;
-	}
 
 	rval = 1;
 	setsockopt(nh->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&rval, sizeof(rval));
@@ -227,7 +237,6 @@ errcode_t
 net_listen(nh_t ** nhp, struct sockaddr_in * sin)
 {
 	int             rval    = 0;
-	int             flags   = 0;
 	int             wsize   = 0;
 	nh_t          * nh      = NULL;
 	errcode_t       ec      = EC_SUCCESS;
@@ -265,25 +274,9 @@ net_listen(nh_t ** nhp, struct sockaddr_in * sin)
 
 	}
 
-	flags = fcntl(nh->fd, F_GETFL, 0);
-	if (flags < 0)
-	{
-		ec = ec_create(EC_GSI_SUCCESS,
-		               EC_GSI_SUCCESS,
-		               "Failed to get socket flags: %s",
-		               strerror(errno));
+	ec = _net_set_nonblocking(nh->fd);
+	if (ec != EC_SUCCESS)
 		goto cleanup;
-	}
-
-	rval = fcntl(nh->fd, F_SETFL, flags|O_NONBLOCK);
-	if (rval < 0)
-	{
-		ec = ec_create(EC_GSI_SUCCESS,
-		               EC_GSI_SUCCESS,
-		               "Failed to set O_NONBLOCK on socket : %s",
-		               strerror(errno));
-		goto cleanup;
-	}
 
 	rval = 1;
 	setsockopt(nh->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&rval, sizeof(rval));
@@ -363,7 +356,8 @@ cleanup:
 errcode_t
 net_accept(nh_t * nh, nh_t ** nhp)
 {
-	int rval = 0;
+	int       rval = 0;
+	errcode_t ec   = EC_SUCCESS;
 
 	*nhp = NULL;
 	rval = accept(nh->fd, NULL, NULL);
@@ -376,6 +370,13 @@ net_accept(nh_t * nh, nh_t ** nhp)
 		                 EC_GSI_SUCCESS,
 		                 "accept() failed: %s",
 		                 strerror(errno));
+
+	ec = _net_set_nonblocking(rval);
+	if (ec != EC_SUCCESS)
+	{
+		close(rval);
+		return ec;
+	}
 
 	*nhp = (nh_t *) malloc(sizeof(nh_t));
 	(*nhp)->fd = rval;

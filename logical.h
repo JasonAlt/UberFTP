@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2010 NCSA.  All rights reserved.
+ * Copyright © 2003-2012 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -40,6 +40,9 @@
  */
 #ifndef UBER_LOGICAL_H
 #define UBER_LOGICAL_H
+
+#include <sys/types.h>
+#include <time.h>
 
 #include <globus_common.h>
 #include "linterface.h"
@@ -100,6 +103,9 @@ errcode_t l_size(lh_t, char * path, globus_off_t * size);
 errcode_t l_expand_tilde(lh_t, char * path, char ** fullpath);
 errcode_t l_stage(lh_t, char * path, int * staged);
 errcode_t l_cksum(lh_t, char * file, int * supported, unsigned int * crc);
+errcode_t l_link(lh_t, char * oldfile, char * newfile);
+errcode_t l_symlink(lh_t, char * oldfile, char * newfile);
+errcode_t l_utime(lh_t, char * path, time_t timestamp);
 #ifdef SYSLOG_PERF
 char * l_rhost(lh_t);
 #endif /* SYSLOG_PERF */
