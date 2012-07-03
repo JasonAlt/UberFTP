@@ -117,110 +117,146 @@ net_connected(nh_t * nh)
 errcode_t
 net_connect(nh_t ** nhp,  struct sockaddr_in * sin)
 {
-	int             rval   = 0;
-	int             wsize  = 0;
-	nh_t          * nh     = NULL;
-	errcode_t       ec     = EC_SUCCESS;
-	unsigned short  port   = 0;
-	unsigned short  minsrc = s_minsrc();
-	unsigned short  maxsrc = s_maxsrc();
+	int             rval            = 0;
+	int             wsize           = 0;
+	int             have_port_range = 0;
+	nh_t          * nh              = NULL;
+	errcode_t       ec              = EC_SUCCESS;
+	unsigned short  port            = 0;
+	unsigned short  minsrc          = s_minsrc();
+	unsigned short  maxsrc          = s_maxsrc();
 	char cname[INET_ADDRSTRLEN];
 	struct sockaddr_in bindsin;
 
+	/* Get our net handle pointer. */
 	nh = *nhp = (nh_t *) malloc(sizeof(nh_t));
 
+	/* Initialize our net handle. */
 	memset(nh, 0, sizeof(nh_t));
+	nh->fd = -1;
 
-	nh->fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (nh->fd == -1)
+	/* Determine if we have a valid port range. */
+	if (minsrc && maxsrc && minsrc < maxsrc)
 	{
-		ec = ec_create(EC_GSI_SUCCESS,
-		               EC_GSI_SUCCESS,
-		               "socket() failed: %s",
-		               strerror(errno));
-		goto cleanup;
+		/* Indicate that we have a valid range. */
+		have_port_range = 1;
+
+		/* Initialize port to the min source port. */
+		port = minsrc;
 	}
 
-	wsize = s_tcpbuf();
-	if (wsize)
+	do
 	{
-		setsockopt(nh->fd, 
-		           SOL_SOCKET, 
-		           SO_SNDBUF, 
-		           (char *) &wsize, 
-		           sizeof(wsize));
-		setsockopt(nh->fd, 
-		           SOL_SOCKET, 
-		           SO_RCVBUF, 
-		           (char *) &wsize, 
-		           sizeof(wsize));
+		/* After our first iteration of this loop, this socket may be open. */
+		if (nh->fd != -1)
+			close(nh->fd);
 
-	}
-
-	ec = _net_set_nonblocking(nh->fd);
-	if (ec != EC_SUCCESS)
-		goto cleanup;
-
-	rval = 1;
-	setsockopt(nh->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&rval, sizeof(rval));
-
-	if (minsrc || maxsrc)
-	{
-		memset(&bindsin, 0, sizeof(struct sockaddr_in));
-		bindsin.sin_family = AF_INET;
-		bindsin.sin_addr.s_addr = INADDR_ANY;
-		for (port = minsrc; port <= maxsrc; port++)
+		/* Create our socket. */
+		nh->fd = socket(AF_INET, SOCK_STREAM, 0);
+		if (nh->fd == -1)
 		{
+			ec = ec_create(EC_GSI_SUCCESS,
+			               EC_GSI_SUCCESS,
+			               "socket() failed: %s",
+			               strerror(errno));
+			goto cleanup;
+		}
+
+		/* Set our TCP buffer write sisze. */
+		wsize = s_tcpbuf();
+		if (wsize)
+		{
+			setsockopt(nh->fd, 
+			           SOL_SOCKET, 
+			           SO_SNDBUF, 
+			           (char *) &wsize, 
+			           sizeof(wsize));
+			setsockopt(nh->fd, 
+			           SOL_SOCKET, 
+			           SO_RCVBUF, 
+			           (char *) &wsize, 
+			           sizeof(wsize));
+
+		}
+
+		/* Set the socket to non blocking. */
+		ec = _net_set_nonblocking(nh->fd);
+		if (ec != EC_SUCCESS)
+			goto cleanup;
+
+		/* Indicate that the socket is to be reused. */
+		rval = 1;
+		setsockopt(nh->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&rval, sizeof(rval));
+
+		/* If we have port ranges... */
+		if (have_port_range)
+		{
+			/* Set us up for the bind. */
+			memset(&bindsin, 0, sizeof(struct sockaddr_in));
+			bindsin.sin_family = AF_INET;
+			bindsin.sin_addr.s_addr = INADDR_ANY;
+
+			/* Bind. */
 			bindsin.sin_port = htons(port);
 			rval = bind(nh->fd, (struct sockaddr *)&bindsin, sizeof(bindsin));
-			if (!rval)
-				break;
 
-			switch (errno)
+			if (rval)
 			{
-			case EADDRNOTAVAIL:
-			case EADDRINUSE:
-			case EACCES:
-				break;
-
-			default:
+				/* Destroy any previous error. */
+				ec_destroy(ec);
+				/* Record this error. */
 				ec = ec_create(EC_GSI_SUCCESS,
 				               EC_GSI_SUCCESS,
 				               "Failed to bind socket : %s",
 				               strerror(errno));
-				goto cleanup;
+
+				/* Retry. */
+				continue;
 			}
 		}
 
-		if (port > maxsrc)
+		/* Connect. */
+		rval = connect(nh->fd, 
+		               (struct sockaddr *)sin, 
+		               sizeof(struct sockaddr_in));
+
+		if (rval && errno != EINPROGRESS)
 		{
-			ec = ec_create(EC_GSI_SUCCESS,
-			               EC_GSI_SUCCESS,
-			               "No available ports in range %hu-%hu",
-			               minsrc,
-			               maxsrc);
-			goto cleanup;
+			/* Destroy any previous error. */
+			ec_destroy(ec);
+			/* Record this error. */
+			ec = ec_create(
+			             EC_GSI_SUCCESS,
+			             EC_GSI_SUCCESS,
+			             "Failed to connect to %s port %d: %s",
+			             inet_ntop(AF_INET, &sin->sin_addr, cname, INET_ADDRSTRLEN),
+						 ntohs(sin->sin_port),
+			             strerror(errno));
+
+			/* Retry. */
+			continue;
 		}
-	}
 
-	rval = connect(nh->fd, 
-	               (struct sockaddr *)sin, 
-	               sizeof(struct sockaddr_in));
-	if (rval && errno != EINPROGRESS)
+		/*
+		 * Success!
+		 */
+
+		/* Destroy any previously recorded error. */
+		ec_destroy(ec);
+
+		/* Indicate success. */
+		ec = EC_SUCCESS;
+
+		/* Exit this loop. */
+		break;
+	} while (have_port_range && ++port < maxsrc);
+
+	if (ec == EC_SUCCESS)
 	{
-		ec = ec_create(
-		             EC_GSI_SUCCESS,
-		             EC_GSI_SUCCESS,
-		             "Failed to connect to %s port %d: %s",
-		             inet_ntop(AF_INET, &sin->sin_addr, cname, INET_ADDRSTRLEN),
-					 ntohs(sin->sin_port),
-		             strerror(errno));
-		goto cleanup;
+		nh->state = NET_STATE_CONNECTED;
+		if (rval && errno == EINPROGRESS)
+			nh->state = NET_STATE_CONNECTING;
 	}
-
-	nh->state = NET_STATE_CONNECTED;
-	if (rval && errno == EINPROGRESS)
-		nh->state = NET_STATE_CONNECTING;
 
 cleanup:
 
