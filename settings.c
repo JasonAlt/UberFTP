@@ -193,7 +193,8 @@ s_setcos(char * Cos)
 {
 	FREE(cos);
 
-	cos = Strdup(Cos);
+	if (strcasecmp(Cos, "default") != 0)
+		cos = Strdup(Cos);
 }
 
 void
@@ -227,7 +228,9 @@ void
 s_setfamily(char * fam)
 {
 	FREE(family);
-	family = Strdup(fam);
+
+	if (strcasecmp(fam, "default") != 0)
+		family = Strdup(fam);
 }
 
 void

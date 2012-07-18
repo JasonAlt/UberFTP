@@ -109,6 +109,8 @@ typedef struct ftp_handle {
 	int hasSiteStage;
 	int hasMFMT;
 	int hasSiteUtime;
+	int hasSiteLscos;
+	int hasSiteLsfam;
 
 	/* Mlsx features */
 	mf_t mf;
@@ -140,7 +142,7 @@ _f_prep_dc(fh_t * fh,
            fh_t * ofh, 
            int    stream,
            int    binary,
-           int    retr);
+           int    retrieve);
 
 static errcode_t
 _f_poll_resp(fh_t * fh, int * code, char ** resp);
@@ -179,19 +181,19 @@ static errcode_t
 _f_setup_dci(fh_t * fh, fh_t * ofh);
 
 static errcode_t
-_f_setup_spor(fh_t * fh, fh_t * ofh, int retr);
+_f_setup_spor(fh_t * fh, fh_t * ofh);
 
 static errcode_t
-_f_setup_spas(fh_t * fh, fh_t * ofh, int retr);
+_f_setup_spas(fh_t * fh, fh_t * ofh);
 
 static errcode_t
-_f_setup_port(fh_t * fh, fh_t * ofh, int retr);
+_f_setup_port(fh_t * fh, fh_t * ofh);
 
 static errcode_t
-_f_setup_pasv(fh_t * fh, fh_t * ofh, int retr);
+_f_setup_pasv(fh_t * fh, fh_t * ofh, int retrieve);
 
 static errcode_t
-_f_setup_conntype(fh_t * fh, fh_t * ofh, int retr);
+_f_setup_conntype(fh_t * fh, fh_t * ofh, int retrieve);
 
 static int
 _f_parse_addrs(
@@ -271,6 +273,8 @@ ftp_connect(pd_t *  pd,
     fh->hasSiteStage   = 1;
     fh->hasMFMT        = 1;
     fh->hasSiteUtime   = 1;
+	fh->hasSiteLscos   = 1;
+	fh->hasSiteLsfam   = 1;
 
 	/* Now grab the feature set, if available. */
 	ec = _f_send_cmd(fh, "FEAT");
@@ -520,10 +524,10 @@ ftp_stor(pd_t * pd,
 	}
 
 	/* Set family. */
-	if (s_family() && fh->hasSiteSetfam)
+	if (fh->hasSiteSetfam)
 	{
 		/* Construct the command */
-		cmd = Sprintf(NULL, "SITE SETFAM %s", s_family());
+		cmd = Sprintf(NULL, "SITE SETFAM %s", s_family() ? s_family() : "DEFAULT");
 
 		/* Send the command */
 		ec  = _f_send_cmd(fh, cmd);
@@ -568,59 +572,56 @@ ftp_stor(pd_t * pd,
 	}
 
 	/* Set class of service. */
-	if (s_cos())
+	if (fh->hasSiteSetCos)
 	{
-		if (fh->hasSiteSetCos)
+		cmd = Sprintf(NULL, "SITE SETCOS %s", s_cos() ? s_cos() : "DEFAULT");
+
+		/* Send the command */
+		ec  = _f_send_cmd(fh, cmd);
+
+		/* Release the command before we return an error. */
+		FREE(cmd);
+
+		/* Check error status. */
+		if (ec)
+			return ec;
+
+		/* Get the response. */
+		ec = _f_get_final_resp(fh, &code, &resp);
+		if (ec)
+			return ec;
+
+		/* If the server didn't recognize the command... */
+		if (F_CODE_UNKNOWN(code))
 		{
-			cmd = Sprintf(NULL, "SITE SETCOS %s", s_cos());
-
-			/* Send the command */
-			ec  = _f_send_cmd(fh, cmd);
-
-			/* Release the command before we return an error. */
-			FREE(cmd);
-
-			/* Check error status. */
-			if (ec)
-				return ec;
-
-			/* Get the response. */
-			ec = _f_get_final_resp(fh, &code, &resp);
-			if (ec)
-				return ec;
-
-			/* If the server didn't recognize the command... */
-			if (F_CODE_UNKNOWN(code))
-			{
-				fh->hasSiteSetCos = 0;
-
-				/* Free the response. */
-				FREE(resp);
-			}
-
-			/* If an error of some sort occurred... */
-			else if (!F_CODE_SUCC(code))
-			{
-				/* Create the error code. */
-				ec = ec_create(EC_GSI_SUCCESS,
-				               EC_GSI_SUCCESS,
-				               "Failed to set the desired COS:\n%s",
-				               resp);
-
-				/* Free the response. */
-				FREE(resp);
-
-				/* Return the error. */
-				return ec;
-			}
-
-			/*
-			 * Success!
-			 */
+			fh->hasSiteSetCos = 0;
 
 			/* Free the response. */
 			FREE(resp);
 		}
+
+		/* If an error of some sort occurred... */
+		else if (!F_CODE_SUCC(code))
+		{
+			/* Create the error code. */
+			ec = ec_create(EC_GSI_SUCCESS,
+			               EC_GSI_SUCCESS,
+			               "Failed to set the desired COS:\n%s",
+			               resp);
+
+			/* Free the response. */
+			FREE(resp);
+
+			/* Return the error. */
+			return ec;
+		}
+
+		/*
+		 * Success!
+		 */
+
+		/* Free the response. */
+		FREE(resp);
 	}
 
 	/* Prepare the data channel. */
@@ -1968,7 +1969,7 @@ ftp_utime (pd_t * pd, char * path, time_t timestamp)
 	int       code = 0;
 	struct tm tm;
 
-	/* Bail if never command exists. */
+	/* Bail if the command is not supported. */
 	if (!fh->hasMFMT && !fh->hasSiteUtime)
 		return EC_SUCCESS;
 
@@ -2040,7 +2041,7 @@ ftp_utime (pd_t * pd, char * path, time_t timestamp)
 	{
 		ec = ec_create(EC_GSI_SUCCESS,
 		               EC_GSI_SUCCESS,
-		               "Error while updating timestamps on %s",
+		               "Error while updating timestamps on %s: %s",
 		               path,
 		               resp);
 
@@ -2070,6 +2071,198 @@ ftp_utime (pd_t * pd, char * path, time_t timestamp)
 		/* Return the error. */
 		return ec;
 	}
+
+	/* Free the response. */
+	FREE(resp);
+
+	/* Success! */
+	return EC_SUCCESS;
+}
+
+errcode_t
+ftp_lscos (pd_t * pd, char ** cos)
+{
+	errcode_t ec   = EC_SUCCESS;
+	fh_t    * fh   = (fh_t *) pd->ftppriv;
+	char    * resp = NULL;
+	char    * c    = NULL;
+	int       code = 0;
+
+	*cos = NULL;
+
+	/* Bail if the command is not supported. */
+	if (!fh->hasSiteLscos)
+		return EC_SUCCESS;
+
+	/* Reconnect */
+	ec = _f_reconnect(fh);
+	if (ec)
+		return ec;
+
+	/* Send the command. */
+	ec = _f_send_cmd(fh, "SITE LSCOS");
+
+	/* If we receive an error, return it. */
+	if (ec)
+		return ec;
+
+	/* Get the final response. */
+	ec = _f_get_final_resp(fh, &code, &resp);
+	if (ec)
+		return ec;
+
+	/* Check if it didn't understand the command. */
+	if (F_CODE_UNKNOWN(code))
+	{
+		fh->hasSiteLscos = 0;
+
+		FREE(resp);
+
+		/* Try again. */
+		return ftp_lscos (pd, cos);
+	}
+
+	/* 400-599 */
+	if (F_CODE_ERR(code))
+	{
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Error retrieving COS list",
+		               resp);
+
+		/* 400-499 */
+		if (F_CODE_TRANS_ERR(code))
+			ec_set_flag(ec, EC_FLAG_CAN_RETRY);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* We should have a success code. */
+	if (!F_CODE_SUCC(code))
+	{
+		/* Create the error code. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Unexpected response when retrieving COS list: %s",
+		               resp);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	if ((c = strchr(resp, '\r')))
+		*c = '\0';
+	if ((c = strchr(resp, '\n')))
+		*c = '\0';
+
+	/* Success! */
+	if (strlen(resp) > 3 && isdigit(resp[0]) && isdigit(resp[1]) && isdigit(resp[2]) && isspace(resp[3]))
+		*cos = strdup(resp+4);
+	else
+		*cos = strdup(resp);
+
+	/* Free the response. */
+	FREE(resp);
+
+	/* Success! */
+	return EC_SUCCESS;
+}
+
+errcode_t
+ftp_lsfam (pd_t * pd, char ** families)
+{
+	errcode_t ec   = EC_SUCCESS;
+	fh_t    * fh   = (fh_t *) pd->ftppriv;
+	char    * resp = NULL;
+	char    * c    = NULL;
+	int       code = 0;
+
+	*families = NULL;
+
+	/* Bail if the command is not supported. */
+	if (!fh->hasSiteLsfam)
+		return EC_SUCCESS;
+
+	/* Reconnect */
+	ec = _f_reconnect(fh);
+	if (ec)
+		return ec;
+
+	/* Send the command. */
+	ec = _f_send_cmd(fh, "SITE LSFAM");
+
+	/* If we receive an error, return it. */
+	if (ec)
+		return ec;
+
+	/* Get the final response. */
+	ec = _f_get_final_resp(fh, &code, &resp);
+	if (ec)
+		return ec;
+
+	/* Check if it didn't understand the command. */
+	if (F_CODE_UNKNOWN(code))
+	{
+		fh->hasSiteLsfam = 0;
+
+		FREE(resp);
+
+		/* Try again. */
+		return ftp_lsfam (pd, families);
+	}
+
+	/* 400-599 */
+	if (F_CODE_ERR(code))
+	{
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Error retrieving family list",
+		               resp);
+
+		/* 400-499 */
+		if (F_CODE_TRANS_ERR(code))
+			ec_set_flag(ec, EC_FLAG_CAN_RETRY);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	/* We should have a success code. */
+	if (!F_CODE_SUCC(code))
+	{
+		/* Create the error code. */
+		ec = ec_create(EC_GSI_SUCCESS,
+		               EC_GSI_SUCCESS,
+		               "Unexpected response when retrieving family list: %s",
+		               resp);
+
+		/* Free the response. */
+		FREE(resp);
+
+		/* Return the error. */
+		return ec;
+	}
+
+	if ((c = strchr(resp, '\r')))
+		*c = '\0';
+	if ((c = strchr(resp, '\n')))
+		*c = '\0';
+
+	/* Success! */
+	if (strlen(resp) > 3 && isdigit(resp[0]) && isdigit(resp[1]) && isdigit(resp[2]) && isspace(resp[3]))
+		*families = strdup(resp+4);
+	else
+		*families = strdup(resp);
 
 	/* Free the response. */
 	FREE(resp);
@@ -2117,6 +2310,8 @@ const Linterface_t FtpInterface = {
 	ftp_link,
 	ftp_symlink,
 	ftp_utime,
+	ftp_lscos,
+	ftp_lsfam,
 #ifdef SYSLOG_PERF
 	ftp_rhost,
 #endif /* SYSLOG_PERF */
@@ -2167,7 +2362,7 @@ _f_prep_dc(fh_t * fh,
            fh_t * ofh, 
            int    stream,
            int    binary,
-           int    retr)
+           int    retrieve)
 {
 	errcode_t ec    = EC_SUCCESS;
 
@@ -2199,7 +2394,7 @@ _f_prep_dc(fh_t * fh,
 	if (ec)
 		return ec;
 
-	ec = _f_setup_conntype(fh, ofh, retr);
+	ec = _f_setup_conntype(fh, ofh, retrieve);
 	if (ec)
 		return ec;
 	return ec;
@@ -2685,7 +2880,7 @@ _f_setup_dci(fh_t * fh, fh_t * ofh)
 }
 
 static errcode_t
-_f_setup_spor(fh_t * fh, fh_t * ofh, int retr)
+_f_setup_spor(fh_t * fh, fh_t * ofh)
 {
 	errcode_t ec   = EC_SUCCESS;
 	int       i    = 0;
@@ -2743,7 +2938,7 @@ _f_setup_spor(fh_t * fh, fh_t * ofh, int retr)
 }
 
 static errcode_t
-_f_setup_spas(fh_t * fh, fh_t * ofh, int retr)
+_f_setup_spas(fh_t * fh, fh_t * ofh)
 {
 	errcode_t ec   = EC_SUCCESS;
 	int       code = 0;
@@ -2806,7 +3001,7 @@ _f_setup_spas(fh_t * fh, fh_t * ofh, int retr)
 }
 
 static errcode_t
-_f_setup_port(fh_t * fh, fh_t * ofh, int retr)
+_f_setup_port(fh_t * fh, fh_t * ofh)
 {
 	errcode_t ec   = EC_SUCCESS;
 	int       code = 0;
@@ -2854,7 +3049,7 @@ _f_setup_port(fh_t * fh, fh_t * ofh, int retr)
 }
 
 static errcode_t
-_f_setup_pasv(fh_t * fh, fh_t * ofh, int retr)
+_f_setup_pasv(fh_t * fh, fh_t * ofh, int retrieve)
 {
 	errcode_t ec   = EC_SUCCESS;
 	int       code = 0;
@@ -2876,10 +3071,10 @@ _f_setup_pasv(fh_t * fh, fh_t * ofh, int retr)
 	if (ofh && !fh->hasPasv)
 	{
 		ofh->stream = 1;
-		ec = _f_setup_conntype(ofh, fh, retr);
+		ec = _f_setup_conntype(ofh, fh, retrieve);
 		if (ec)
 			return ec;
-		return _f_setup_conntype(fh, ofh, retr);
+		return _f_setup_conntype(fh, ofh, retrieve);
 	}
 
 	if (!fh->hasPasv)
@@ -2914,11 +3109,11 @@ _f_setup_pasv(fh_t * fh, fh_t * ofh, int retr)
 		if (ofh)
 		{
 			ofh->stream = 1;
-			ec = _f_setup_conntype(ofh, fh, retr);
+			ec = _f_setup_conntype(ofh, fh, retrieve);
 			if (ec)
 				return ec;
 		}
-		return _f_setup_conntype(fh,  ofh, retr);
+		return _f_setup_conntype(fh,  ofh, retrieve);
 	}
 
 	scnt = _f_parse_addrs(resp, &sinp);
@@ -2948,34 +3143,25 @@ _f_setup_pasv(fh_t * fh, fh_t * ofh, int retr)
 }
 
 static errcode_t
-_f_setup_conntype(fh_t * fh, fh_t * ofh, int retr)
+_f_setup_conntype(fh_t * fh, fh_t * ofh, int retrieve)
 {
-	errcode_t ec = EC_SUCCESS;
-
-	/* Setup the passive side. */
-	switch (fh->stream)
+	/*
+	 * Setup the passive side.
+	 */
+	if (fh->stream)
 	{
-	case 0: /* Extended block */
-		switch (retr)
-		{
-		case 0:
-			return _f_setup_spas(fh, ofh, retr);
-		default:
-			return _f_setup_spor(fh, ofh, retr);
-		}
+		if ((!ofh && s_passive()) || (ofh && !ofh->sinp))
+			return _f_setup_pasv(fh, ofh, retrieve);
 
-	default: /* Streams */
-		switch((!ofh && s_passive()) || (ofh && !ofh->sinp))
-		{
-		case 0: /* Port */
-			return _f_setup_port(fh, ofh, retr);
-
-		default: /* Pasv */
-			return _f_setup_pasv(fh, ofh, retr);
-		}
+		return _f_setup_port(fh, ofh);
 	}
 
-	return ec;
+	/*
+	 * Extended block mode.
+	 */
+	if (retrieve)
+		return _f_setup_spor(fh, ofh);
+	return _f_setup_spas(fh, ofh);
 }
 
 static int

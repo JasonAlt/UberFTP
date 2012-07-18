@@ -106,6 +106,8 @@ errcode_t l_cksum(lh_t, char * file, int * supported, unsigned int * crc);
 errcode_t l_link(lh_t, char * oldfile, char * newfile);
 errcode_t l_symlink(lh_t, char * oldfile, char * newfile);
 errcode_t l_utime(lh_t, char * path, time_t timestamp);
+errcode_t l_lscos(lh_t, char **);
+errcode_t l_lsfam(lh_t, char **);
 #ifdef SYSLOG_PERF
 char * l_rhost(lh_t);
 #endif /* SYSLOG_PERF */

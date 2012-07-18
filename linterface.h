@@ -51,12 +51,12 @@
 #include "errcode.h"
 #include "ml.h"
 
-typedef struct {
+typedef struct private_data {
 	void * ftppriv;
 	void * unixpriv;
 } pd_t;
 
-typedef struct {
+typedef struct logical_interface {
 	errcode_t (*connect)(pd_t *, 
 	                     char *  host, 
 	                     int     port, 
@@ -104,6 +104,8 @@ typedef struct {
 	errcode_t (*link)(pd_t *, char * oldpath, char * newpath);
 	errcode_t (*symlink)(pd_t *, char * oldpath, char * newpath);
 	errcode_t (*utime)(pd_t *, char * path, time_t timestamp);
+	errcode_t (*lscos) (pd_t *, char **);
+	errcode_t (*lsfam) (pd_t *, char **);
 #ifdef SYSLOG_PERF
 	char *    (*rhost) (pd_t *);
 #endif /* SYSLOG_PERF */

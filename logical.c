@@ -54,7 +54,7 @@
 
 struct logical_handle {
 	Linterface_t li;
-	Linterface_t li_uc;
+	Linterface_t li_uc; /* unconnected interface */
 	pd_t privdata;
 };
 
@@ -302,6 +302,18 @@ errcode_t
 l_utime(lh_t lh, char * path, time_t timestamp)
 {
 	return lh->li.utime(&lh->privdata, path, timestamp);
+}
+
+errcode_t
+l_lscos(lh_t lh, char ** cos)
+{
+	return lh->li.lscos(&lh->privdata, cos);
+}
+
+errcode_t
+l_lsfam(lh_t lh, char ** families)
+{
+	return lh->li.lsfam(&lh->privdata, families);
 }
 
 #ifdef SYSLOG_PERF

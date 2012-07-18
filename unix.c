@@ -994,6 +994,24 @@ unix_utime(pd_t * pd, char * path, time_t timestamp)
 	return ec;
 }
 
+static errcode_t
+unix_lscos(pd_t * pd, char ** cos)
+{
+	*cos = NULL;
+	return ec_create(EC_GSI_SUCCESS,
+	                 EC_GSI_SUCCESS,
+	                 "lscos not supported locally");
+}
+
+static errcode_t
+unix_lsfam(pd_t * pd, char ** families)
+{
+	*families = NULL;
+	return ec_create(EC_GSI_SUCCESS,
+	                 EC_GSI_SUCCESS,
+	                 "lsfam not supported locally");
+}
+
 #ifdef SYSLOG_PERF
 char *
 unix_rhost (pd_t * pd)
@@ -1032,6 +1050,8 @@ const Linterface_t UnixInterface = {
 	unix_link,
 	unix_symlink,
 	unix_utime,
+	unix_lscos,
+	unix_lsfam,
 #ifdef SYSLOG_PERF
 	unix_rhost,
 #endif /* SYSLOG_PERF */

@@ -166,6 +166,8 @@ static cmdret_t  _c_hash();
 static cmdret_t  _c_help(char * cmd);
 static cmdret_t  _c_keepalive(int seconds);
 static cmdret_t  _c_list(ch_t *, int rflag, char * path, char * ofile);
+static cmdret_t  _c_lscos(ch_t *);
+static cmdret_t  _c_lsfam(ch_t *);
 static cmdret_t  _c_mkdir(ch_t *, char ** dirs);
 static cmdret_t  _c_mode(char mode);
 static cmdret_t  _c_mget(ch_t *, ch_t *, int rflag, char ** files);
@@ -454,9 +456,15 @@ static cmd_t gcmdlist [] = {
 "target  Directory or file to list. '.' is used by default.\n"
 "file    Write listing to [file].\n"},
 
+	{ _c_lscos,       "llscos", C_A_LCH_1|C_A_NOARGS,
+"List the available COS on the local server (if supported).\n"},
+
+	{ _c_lsfam,       "llsfam", C_A_LCH_1|C_A_NOARGS,
+"List the available families on the local server (if supported).\n"},
+
 #ifdef MSSFTP
 	{ _c_rm,     "lmdelete", C_A_LCH_1|C_A_OPT_r|C_A_STRINGS,
-"Alias for lm. This command has been deprecated.\n",
+"Alias for lrm. This command has been deprecated.\n",
 "lmdelete [-r] object1 [object1...objectn]\n",
 "-r   Recursively remove the given directory.\n"},
 #endif /* MSSFTP */
@@ -512,6 +520,12 @@ static cmd_t gcmdlist [] = {
 "-r      Recursively list [target].\n"
 "target  Directory or file to list. '.' is used by default.\n"
 "file    Write listing to [file].\n"},
+
+	{ _c_lscos,       "lscos", C_A_RCH_1|C_A_NOARGS,
+"List the available COS on the remote server (if supported).\n"},
+
+	{ _c_lsfam,       "lsfam", C_A_RCH_1|C_A_NOARGS,
+"List the available families on the remote server (if supported).\n"},
 
 	{ _c_size, "lsize", C_A_LCH_1|C_A_STRINGS,
 "Prints the size of the given object(s).\n",
@@ -1960,6 +1974,47 @@ _c_list(ch_t * ch, int rflag, char * path, char * ofile)
 	return cr;
 }
 
+static cmdret_t
+_c_lscos(ch_t * ch)
+{
+	errcode_t   ec       = EC_SUCCESS;
+	cmdret_t    cr       = CMD_SUCCESS;
+	char      * cos_list = NULL;
+
+	C_RETRY(ec, l_lscos(ch->lh, &cos_list));
+
+	if (ec != EC_SUCCESS)
+		cr = CMD_ERR_OTHER;
+	else
+		o_printf(DEBUG_ERRS_ONLY, "%s\n", cos_list);
+
+	FREE(cos_list);
+	ec_print(ec);
+	ec_destroy(ec);
+
+	return cr;
+}
+
+static cmdret_t
+_c_lsfam(ch_t * ch)
+{
+	errcode_t   ec          = EC_SUCCESS;
+	cmdret_t    cr          = CMD_SUCCESS;
+	char      * family_list = NULL;
+
+	C_RETRY(ec, l_lsfam(ch->lh, &family_list));
+
+	if (ec != EC_SUCCESS)
+		cr = CMD_ERR_OTHER;
+	else
+		o_printf(DEBUG_ERRS_ONLY, "%s\n", family_list);
+
+	FREE(family_list);
+	ec_print(ec);
+	ec_destroy(ec);
+
+	return cr;
+}
 
 static cmdret_t
 _c_mkdir(ch_t * ch, char ** dirs)

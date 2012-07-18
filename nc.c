@@ -207,6 +207,37 @@ nc_cksum (pd_t * pd, char * file, int * supported, unsigned int * crc)
 	return ec_create(EC_GSI_SUCCESS, EC_GSI_SUCCESS, "Not connected.");
 }
 
+errcode_t 
+nc_link(pd_t * pd, char * oldpath, char * newpath)
+{
+	return ec_create(EC_GSI_SUCCESS, EC_GSI_SUCCESS, "Not connected.");
+}
+
+errcode_t 
+nc_symlink(pd_t * pd, char * oldpath, char * newpath)
+{
+	return ec_create(EC_GSI_SUCCESS, EC_GSI_SUCCESS, "Not connected.");
+}
+
+errcode_t 
+nc_utime(pd_t * pd, char * path, time_t timestamp)
+{
+	return ec_create(EC_GSI_SUCCESS, EC_GSI_SUCCESS, "Not connected.");
+}
+
+errcode_t 
+nc_lscos (pd_t * pd, char ** cos)
+{
+	return ec_create(EC_GSI_SUCCESS, EC_GSI_SUCCESS, "Not connected.");
+}
+
+errcode_t 
+nc_lsfam (pd_t * pd, char ** families)
+{
+	return ec_create(EC_GSI_SUCCESS, EC_GSI_SUCCESS, "Not connected.");
+}
+
+
 #ifdef SYSLOG_PERF
 char *
 nc_rhost (pd_t * pd)
@@ -242,6 +273,11 @@ const Linterface_t NcInterface = {
 	nc_expand_tilde,
 	nc_stage,
 	nc_cksum,
+	nc_link,
+	nc_symlink,
+	nc_utime,
+	nc_lscos,
+	nc_lsfam,
 #ifdef SYSLOG_PERF
 	nc_rhost,
 #endif /* SYSLOG_PERF */

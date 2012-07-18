@@ -118,12 +118,18 @@ Enable/Disable CRC checks after file transfers.
 .TP
 .B \-cos \fIname\fR
 Set the storage class of service to \fIname\fR. Used with HPSS installations.
+Use the class of service name \fIdefault\fR to allow the remote
+server to decide which class of service to use.
+.TP
+.B \-d
+Enable debugging. Same as '-debug 3'. Deprecated.
 .TP
 .B \-debug \fIn\fR
 Set the debug level to \fIn\fR.
 .TP
 .B \-family \fIname\fR
-Set the storage family to \fIname\fR.
+Set the storage family to \fIname\fR. Use the family name \fIdefault\fR to allow the remote
+server to decide which family to use.
 .TP
 .B \-glob [\fIon\fR|\fIoff\fR]
 Enable/Disable filename expansion.
@@ -320,6 +326,8 @@ NCSA's mass storage system.
 .B cos \fIname\fR
 Sets the HPSS class of service to \fIname\fR on the FTP service if the service
 supports it. If \fIname\fR is omitted, the current class of service is printed.
+Use the class of service name \fIdefault\fR to allow the remote
+server to decide which class of service to use.
 .TP
 .B dcau [\fIN\fR|\fIA\fR|\fIS\fR \fIsubject\fR]
 Change the data channel authentication settings. If the service does not
@@ -347,6 +355,8 @@ is set to the given level.
 .B family \fIname\fR
 Sets the tape family to \fIname\fR on the FTP service if the service
 supports it. If \fIname\fR is omitted, the current family is printed.
+Use the family name \fIdefault\fR to allow the remote
+server to decide which family to use.
 .TP
 .B glob [\fIon\fR|\fIoff\fR]
 Enable or disable filename globbing. If no option is given, this command
@@ -365,7 +375,7 @@ then the current working directory is used.
 \fItarget\fR  Directory or file to list. '.' is used by default.
 .TP
 .B get [\fI-r\fR] \fIsource\fR [\fIdestination\fR]
-Retreive file(s) from the remote service. If \fIsource\fR implies multiple
+Retrieve file(s) from the remote service. If \fIsource\fR implies multiple
 transfers, either through regular expressions or by using the recursive
 feature, then \fIdestination\fR must be a directory. If \fIdestination\fR is not
 specified, \fIsource\fR is used.
@@ -436,6 +446,12 @@ then the current working directory is used.
 .br
 target  Directory or file to list. '.' is used by default.
 .TP
+.B llscos
+List the available class of services on the local server (HPSS only).
+.TP
+.B llsfam
+List the available tape families on the local server (HPSS only).
+.TP
 .B lmkdir  \fIdir1\fR [\fIdir2\fR ... \fIdirn\fR]
 Create the local directory(ies).
 .TP
@@ -486,6 +502,12 @@ then the current working directory is used.
 \fI-r\fR      Recursively list \fItarget\fR.
 .br
 \fItarget\fR  Directory or file to list. '.' is used by default.
+.TP
+.B lscos
+List the available class of services on the remote server (HPSS only).
+.TP
+.B lsfam
+List the available tape families on the remote server (HPSS only).
 .TP
 .B lsize \fIfile1\fR [\fIfile2\fR...\fIfilen\fR]
 Prints the size of the given object(s).
@@ -628,7 +650,7 @@ confidential and safe.
 .br
 \fIP\fR  Set protection level to private.
 .TP
-.B get [\fI-r\fR] \fIsource\fR [\fIdestination\fR]
+.B put [\fI-r\fR] \fIsource\fR [\fIdestination\fR]
 Store file(s) to the remote service. If \fIsource\fR implies multiple
 transfers, either through regular expressions or by using the recursive
 feature, then \fIdestination\fR must be a directory. If \fIdestination\fR is not
