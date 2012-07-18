@@ -48,6 +48,11 @@
 #include <ctype.h>
 #include <time.h>
 
+      #include <sys/socket.h>
+       #include <netinet/in.h>
+       #include <arpa/inet.h>
+
+
 #include <globus_common.h>
 
 #include "config.h"
@@ -61,38 +66,40 @@
 char *
 GetRealHostName(char * host)
 {
-	struct hostent *hp, h, hn;
-	char buffer[512];
-	char buffer2[512];
-	struct in_addr addr;
-	int err;
+	int rc = 0;
+	char name[NI_MAXHOST];
+	struct addrinfo hints;
+	struct addrinfo * res = NULL;
 
-	hp = globus_libc_gethostbyname_r(
-	        host, &h, buffer,
-	        512,
-	        &err);
-
-	/* cant lookup, no need to continue */
-	if (hp == GLOBUS_NULL)
+	if (!host)
 		return NULL;
 
-	memcpy(&addr.s_addr, h.h_addr, sizeof(struct in_addr));
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_flags    = AI_ADDRCONFIG;
+	hints.ai_family   = 0;
+	hints.ai_socktype = 0;
+	hints.ai_protocol = 0;
 
-	/* can skip localhost, globus does a local hostname lookup already */
-	if (ntohl(addr.s_addr) == INADDR_LOOPBACK)
-		return NULL;
+	rc = getaddrinfo(host, NULL, &hints, &res);
 
-	hp = globus_libc_gethostbyaddr_r(
-	        (char *) &addr, h.h_length, h.h_addrtype,
-	        &hn, buffer2, 512,
-	        &err);
+	if (rc)
+		return Strdup(host);
 
-	/* cant do reverse lookup. ignore */
-	if (hp == GLOBUS_NULL)
-		return NULL;
+	rc = getnameinfo(res->ai_addr,
+	                 res->ai_addrlen,
+	                 name,
+	                 sizeof(name),
+	                 NULL,
+	                 0,
+	                 0);
 
-	return strdup(hp->h_name);
+	freeaddrinfo(res);
+	if (rc)
+		return Strdup(host);
+
+	return Strdup(name);
 }
+
 
 char *
 Strdup(char * str)
