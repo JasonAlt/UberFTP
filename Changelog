@@ -1,4 +1,4 @@
-Version 2.7 03/28/12
+Version 2.7 07/11/12
 	- Added a patch from Craig Tierney of NOAA to allow file size suffixes
 	  'K', 'M', 'G' and 'T' so that values can be converted to kibibytes,
 	  mebibytes, gibibytes and tebibytes, respectively. The chance has been
@@ -23,6 +23,14 @@ Version 2.7 03/28/12
 	- Fixed build against Globus 5.2.x
 	- Removed SETFAM, WIND, SITE BUFSIZE
 	- Fixed EADDRNOTAVAIL bug on SLES10 when using port ranges
+	- Fixed typos in the manpage
+	- Added support for SITE SETCOS
+	- The commands 'cos' and 'family' now take the value 'default' which
+	  causes the server to decide which cos or family to use when files 
+	  are stored.
+	- Fixed reverse DNS looks for GSI name comparison.
+	- Added new commands lscos/llscos to list available classes of service and
+	  lsfam/llsfam to list available tape families.
 
 Version 2.6 8/5/10
 	- Fixed a segfault found on a UV10 running SLES11. The crash occurs
