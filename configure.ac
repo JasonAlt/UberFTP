@@ -42,7 +42,7 @@ dnl
 dnl Process this file with autoconf to produce a configure script.
 # First [] is used as the prompt
 # Last [] is used for the version information
-AC_INIT(UberFTP (2.7 BETA 3), [2.7_BETA_3], [Jason Alt <jalt@ncsa.uiuc.edu>],[uberftp-client])
+AC_INIT(UberFTP (2.7 BETA 4), [2.7_BETA_4], [Jason Alt <jalt@ncsa.uiuc.edu>],[uberftp-client])
 AM_INIT_AUTOMAKE 
 
 GPT_MAJOR="2"
