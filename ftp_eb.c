@@ -118,7 +118,7 @@ static errcode_t
 _f_eb_push_data(ebpd_t * ebpd, dc_t * dc);
 
 static errcode_t
-_f_eb_active(dch_t * dch, struct sockaddr_in * sin, int scnt)
+_f_eb_active(dch_t * dch, struct sockaddr * sin, socklen_t sin_len, int scnt)
 {
 	errcode_t ec   = EC_SUCCESS;
 	ebpd_t  * ebpd = NULL;
@@ -136,7 +136,7 @@ _f_eb_active(dch_t * dch, struct sockaddr_in * sin, int scnt)
 		for (p = 0; p < s_parallel(); p++)
 		{
 			/* Non blocking connect. */
-			ec = net_connect(&ebpd->dcs[ebpd->dccnt].nh, &sin[s]);
+			ec = net_connect(&ebpd->dcs[ebpd->dccnt].nh, &sin[s], sin_len);
 			if (ec)
 				return ec;
 
@@ -149,7 +149,7 @@ _f_eb_active(dch_t * dch, struct sockaddr_in * sin, int scnt)
 }
 
 static errcode_t
-_f_eb_passive(dch_t * dch, struct sockaddr_in * sin)
+_f_eb_passive(dch_t * dch, struct sockaddr * sin, socklen_t sin_len)
 {
 	errcode_t ec   = EC_SUCCESS;
 	ebpd_t  * ebpd = NULL;
@@ -160,7 +160,7 @@ _f_eb_passive(dch_t * dch, struct sockaddr_in * sin)
 	ebpd->dcs = (dc_t*) malloc(sizeof(dc_t));
 	memset(ebpd->dcs, 0, sizeof(dc_t));
 
-	ec = net_listen(&ebpd->dcs[0].nh, sin);
+	ec = net_listen(&ebpd->dcs[0].nh, sin, sin_len);
 	if (ec)
 		return ec;
 

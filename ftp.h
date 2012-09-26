@@ -53,8 +53,8 @@ extern const Linterface_t FtpInterface;
 typedef struct _dch_ dch_t;
 
 typedef struct _dci_h {
-	errcode_t (*active)(dch_t *, struct sockaddr_in *, int scnt);
-	errcode_t (*passive)(dch_t *, struct sockaddr_in * sin);
+	errcode_t (*active)(dch_t *, struct sockaddr *, socklen_t, int scnt);
+	errcode_t (*passive)(dch_t *, struct sockaddr * sin, socklen_t sin_len);
 	errcode_t (*read_ready) (dch_t * dch, int * ready);
 	errcode_t (*read)(dch_t *, 
 	                  char         ** buf,

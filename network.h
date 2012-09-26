@@ -51,10 +51,10 @@ int
 net_connected(nh_t * nh);
 
 errcode_t
-net_connect(nh_t ** nh, struct sockaddr_in *);
+net_connect(nh_t ** nh, struct sockaddr * sin, socklen_t sin_len);
 
 errcode_t
-net_listen(nh_t ** nhp, struct sockaddr_in * sin);
+net_listen(nh_t ** nhp, struct sockaddr * sin, socklen_t sin_len);
 
 errcode_t
 net_accept(nh_t * nh, nh_t ** nhp);
@@ -78,9 +78,12 @@ errcode_t
 net_poll(nh_t * nh, int * read, int * write, int timeout);
 
 errcode_t
-net_getsockname(nh_t * nh, struct sockaddr_in * sin);
+net_getsockname(nh_t * nh, struct sockaddr * sin, socklen_t sin_len);
 
 errcode_t
-net_translate(char * host, int port, struct sockaddr_in * sin);
+net_getpeername(nh_t * nh, struct sockaddr * sin, socklen_t sin_len);
+
+errcode_t
+net_translate(char * host, int port, struct addrinfo ** saddr);
 
 #endif /* UBER_NETWORK_H */

@@ -52,8 +52,7 @@
        #include <netinet/in.h>
        #include <arpa/inet.h>
 
-
-#include <globus_common.h>
+#include <netdb.h>
 
 #include "config.h"
 #include "misc.h"

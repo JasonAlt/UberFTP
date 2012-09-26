@@ -46,6 +46,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
+#include <arpa/inet.h>
 
 #include "linterface.h"
 #include "settings.h"
@@ -102,6 +103,7 @@ typedef struct ftp_handle {
 	int hasSiteSetfam;
 	int hasSiteSetCos;
 	int hasPasv;
+	char * pasvCmd;
 	int hasAllo;
 	int hasSize;
 	int hasSbuf;
@@ -120,7 +122,7 @@ typedef struct ftp_handle {
 	int ascii;  /* 0 binary, 1 ascii */
 
 	/* Connection information */
-	struct sockaddr_in * sinp;
+	struct sockaddr * sinp;
 	int scnt;
 
 	/* Flag to indicate that we are expecting a response. */
@@ -197,8 +199,11 @@ _f_setup_conntype(fh_t * fh, fh_t * ofh, int retrieve);
 
 static int
 _f_parse_addrs(
-    char               *  str,
-    struct sockaddr_in ** sinp);
+    fh_t * fh, char *  str,
+    struct sockaddr_storage ** sinp);
+
+static char *
+_f_rfc2428_extaddr(struct sockaddr *sinp);
 
 static void
 _f_mlsx(char * str, ml_t * ml);
@@ -266,6 +271,7 @@ ftp_connect(pd_t *  pd,
 	fh->hasSiteSetCos  = 1;
     fh->hasSiteSum     = 1;
     fh->hasPasv        = 1;
+    fh->pasvCmd        = "EPSV";
     fh->hasAllo        = 1;
     fh->hasSize        = 1;
     fh->hasSbuf        = 1;
@@ -2325,6 +2331,7 @@ _f_send_cmd(fh_t * fh, char * cmd)
 	char * buf   = Sprintf(NULL, "%s\r\n", cmd);
 	char * wmsg  = NULL;
 
+	o_printf(DEBUG_VERBOSE, "---> Sending to %s:\n", fh->host);
 	o_printf(DEBUG_VERBOSE, buf);
 
 	if (strncasecmp(buf, "ADAT ", 5) == 0)
@@ -2888,8 +2895,9 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 	int       scnt = 1;
 	char    * cmd  = NULL;
 	char    * resp = NULL;
-	struct sockaddr_in   sin;
-	struct sockaddr_in * sinp = NULL;
+	char    * extaddr;
+	struct sockaddr_storage   sin;
+	struct sockaddr * sinp = NULL;
 
 	if (ofh)
 	{
@@ -2899,27 +2907,38 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 
 	if (!sinp)
 	{
-		ec = net_getsockname(fh->cc.nh, &sin);
+		ec = net_getsockname(fh->cc.nh, (struct sockaddr *)&sin, sizeof(struct sockaddr_storage));
 		if (ec)
 			return ec;
-		sin.sin_port = 0;
+		if (sin.ss_family == AF_INET)
+			((struct sockaddr_in *)&sin)->sin_port = 0;
+		else if (sin.ss_family == AF_INET6)
+			((struct sockaddr_in6 *)&sin)->sin6_port = 0;
 
-		ec = fh->dcs.dci.passive(&fh->dcs, &sin);
+		ec = fh->dcs.dci.passive(&fh->dcs, (struct sockaddr *)&sin, sizeof(struct sockaddr_storage));
 		if (ec)
 			return ec;
-		sinp = &sin;
+		sinp = (struct sockaddr *)&sin;
 	}
 
 	for (i = 0; i < scnt; i++)
 	{
-		cmd = Sprintf(cmd, 
+		if (sinp[i].sa_family == AF_INET6) 
+		{
+			/* SPOR supports both old and new address syntaxes */
+			extaddr = _f_rfc2428_extaddr((struct sockaddr *)&sinp[i]);
+			cmd = Sprintf(cmd, "SPOR %s", extaddr);
+			FREE(extaddr);
+		} else {
+			cmd = Sprintf(cmd, 
 		             "SPOR %d,%d,%d,%d,%d,%d",
-		             (ntohl(sinp[i].sin_addr.s_addr) >> 24) & 0xFF,
-		             (ntohl(sinp[i].sin_addr.s_addr) >> 16) & 0xFF,
-		             (ntohl(sinp[i].sin_addr.s_addr) >>  8) & 0xFF,
-		             (ntohl(sinp[i].sin_addr.s_addr) >>  0) & 0xFF,
-		             (ntohs(sinp[i].sin_port) >> 8) & 0xFF,
-		             (ntohs(sinp[i].sin_port) >> 0) & 0xFF);
+		             (ntohl(((struct sockaddr_in *)&sinp[i])->sin_addr.s_addr) >> 24) & 0xFF,
+		             (ntohl(((struct sockaddr_in *)&sinp[i])->sin_addr.s_addr) >> 16) & 0xFF,
+		             (ntohl(((struct sockaddr_in *)&sinp[i])->sin_addr.s_addr) >>  8) & 0xFF,
+		             (ntohl(((struct sockaddr_in *)&sinp[i])->sin_addr.s_addr) >>  0) & 0xFF,
+		             (ntohs(((struct sockaddr_in *)&sinp[i])->sin_port) >> 8) & 0xFF,
+		             (ntohs(((struct sockaddr_in *)&sinp[i])->sin_port) >> 0) & 0xFF);
+		}
 	}
 
 	ec = _f_send_cmd(fh, cmd);
@@ -2944,9 +2963,33 @@ _f_setup_spas(fh_t * fh, fh_t * ofh)
 	int       code = 0;
 	int       scnt = 0;
 	char    * resp = NULL;
-	struct sockaddr_in * sinp = NULL;
+	char	* command = "SPAS";
+	struct sockaddr_storage * sinp = NULL;
+	struct sockaddr_storage peer, opeer;
 
-	ec = _f_send_cmd(fh, "SPAS");
+	/* Use 'SPAS protocol' command on IPv6 */
+	if (net_getpeername(fh->cc.nh, 
+				(struct sockaddr *)&peer, 
+				sizeof(peer)) == EC_SUCCESS)
+	{
+		if (peer.ss_family == AF_INET6)
+		{
+			command = "SPAS 2";
+			if (ofh)
+			{
+				/* IPv4 if needed for third-party. */
+				if (net_getpeername(ofh->cc.nh,
+					(struct sockaddr *)&opeer, 
+					sizeof(opeer)) == EC_SUCCESS)
+				{
+					if (opeer.ss_family == AF_INET)
+						command = "SPAS 1";
+				}
+			}
+		}
+	}
+
+	ec = _f_send_cmd(fh, command);
 	if (ec)
 		return ec;
 
@@ -2958,7 +3001,8 @@ _f_setup_spas(fh_t * fh, fh_t * ofh)
 	{
 		ec = ec_create(EC_GSI_SUCCESS,
 		               EC_GSI_SUCCESS,
-		               "Bad response to SPAS: %s",
+		               "Bad response to %s: %s",
+		               command,
 		               resp);
 		FREE(resp);
 		return ec;
@@ -2968,19 +3012,21 @@ _f_setup_spas(fh_t * fh, fh_t * ofh)
 	{
 		ec = ec_create(EC_GSI_SUCCESS,
 		               EC_GSI_SUCCESS,
-			           "SPAS command failed: %s",
+			       "%s command failed: %s",
+		               command,
 		               resp);
 		FREE(resp);
 		return ec;
 	}
 
-	scnt = _f_parse_addrs(resp, &sinp);
+	scnt = _f_parse_addrs(fh, resp, &sinp);
 
 	if (scnt == 0)
 	{
 		ec = ec_create(EC_GSI_SUCCESS,
 		               EC_GSI_SUCCESS,
-		               "No addresses found in SPAS response:\n%s",
+		               "No addresses found in %s response:\n%s",
+		               command,
 		               resp);
 		FREE(resp);
 		return ec;
@@ -2991,11 +3037,11 @@ _f_setup_spas(fh_t * fh, fh_t * ofh)
 	{
 		/* Third party */
 		fh->scnt = scnt;
-		fh->sinp = sinp;
+		fh->sinp = (struct sockaddr *)sinp;
 		return ec;
 	}
 
-	ec = fh->dcs.dci.active(&fh->dcs, sinp, scnt);
+	ec = fh->dcs.dci.active(&fh->dcs, (struct sockaddr *)sinp, sizeof(struct sockaddr_storage), scnt);
 	FREE(sinp);
 	return ec;
 }
@@ -3007,31 +3053,44 @@ _f_setup_port(fh_t * fh, fh_t * ofh)
 	int       code = 0;
 	char    * cmd  = NULL;
 	char    * resp = NULL;
-	struct sockaddr_in   sin;
+	char    * extaddr;
+	struct sockaddr_storage   sin;
 
 	if (ofh)
-		memcpy(&sin, ofh->sinp, sizeof(struct sockaddr_in));
+		memcpy(&sin, ofh->sinp, sizeof(struct sockaddr_storage));
 
 	if (!ofh)
 	{
-		ec = net_getsockname(fh->cc.nh, &sin);
+		ec = net_getsockname(fh->cc.nh, (struct sockaddr *)&sin, sizeof(struct sockaddr_storage));
 		if (ec)
 			return ec;
-		sin.sin_port = 0;
+		if (sin.ss_family == AF_INET) 
+			((struct sockaddr_in *)&sin)->sin_port = 0;
+		else if (sin.ss_family == AF_INET6) 
+			((struct sockaddr_in6 *)&sin)->sin6_port = 0;
 
-		ec = fh->dcs.dci.passive(&fh->dcs, &sin);
+		ec = fh->dcs.dci.passive(&fh->dcs, (struct sockaddr *)&sin, sizeof(struct sockaddr_storage));
 		if (ec)
 			return ec;
 	}
 
-	cmd = Sprintf(cmd,
-	        "PORT %d,%d,%d,%d,%d,%d",
-	        (ntohl(sin.sin_addr.s_addr) >> 24) & 0xFF,
-	        (ntohl(sin.sin_addr.s_addr) >> 16) & 0xFF,
-	        (ntohl(sin.sin_addr.s_addr) >>  8) & 0xFF,
-	        (ntohl(sin.sin_addr.s_addr) >>  0) & 0xFF,
-	        (ntohs(sin.sin_port) >> 8) & 0xFF,
-	        (ntohs(sin.sin_port) >> 0) & 0xFF);
+	if (sin.ss_family == AF_INET6)
+	{
+		extaddr = _f_rfc2428_extaddr((struct sockaddr *)&sin);
+		/* Use EPRT for IPv6 only (for the time being) */
+		cmd = Sprintf(cmd, "EPRT %s", extaddr);
+		FREE(extaddr);
+
+	} else {
+		cmd = Sprintf(cmd,
+		        "PORT %d,%d,%d,%d,%d,%d",
+		        (ntohl(((struct sockaddr_in *)&sin)->sin_addr.s_addr) >> 24) & 0xFF,
+		        (ntohl(((struct sockaddr_in *)&sin)->sin_addr.s_addr) >> 16) & 0xFF,
+		        (ntohl(((struct sockaddr_in *)&sin)->sin_addr.s_addr) >>  8) & 0xFF,
+		        (ntohl(((struct sockaddr_in *)&sin)->sin_addr.s_addr) >>  0) & 0xFF,
+		        (ntohs(((struct sockaddr_in *)&sin)->sin_port) >> 8) & 0xFF,
+		        (ntohs(((struct sockaddr_in *)&sin)->sin_port) >> 0) & 0xFF);
+	}
 
 	ec = _f_send_cmd(fh, cmd);
 	FREE(cmd);
@@ -3055,7 +3114,8 @@ _f_setup_pasv(fh_t * fh, fh_t * ofh, int retrieve)
 	int       code = 0;
 	int       scnt = 0;
 	char    * resp = NULL;
-	struct sockaddr_in * sinp = NULL;
+	struct sockaddr_storage * sinp = NULL;
+	struct sockaddr_storage peer;
 
 	/* Passive retry */
 	if (ofh && fh->sinp)
@@ -3083,19 +3143,61 @@ _f_setup_pasv(fh_t * fh, fh_t * ofh, int retrieve)
 		      EC_GSI_SUCCESS,
 		      "This service does not support passive connections.");
 
-	ec = _f_send_cmd(fh, "PASV");
-	if (ec)
-		return ec;
+	if (ofh && (strcmp(fh->pasvCmd,"PASV") != 0))
+	{
+		/* Need to ask for a protocol compatible with ofh */
+		if (net_getpeername(ofh->cc.nh, 
+					(struct sockaddr *)&peer, 
+					sizeof(peer)) == EC_SUCCESS)
+		{
+			if (peer.ss_family == AF_INET) 
+				fh->pasvCmd = "PASV";
+			else if (peer.ss_family == AF_INET6)
+				fh->pasvCmd = "EPSV 2";
+		}
+	}
 
-	ec = _f_get_final_resp(fh, &code, &resp);
-	if (ec)
-		return ec;
+	for(;;) /* Try falling back on 'PASV' command if 'EPSV' fails */
+	{
+		ec = _f_send_cmd(fh, fh->pasvCmd);
+		if (ec)
+		{
+			if (strcmp(fh->pasvCmd,"PASV") != 0)
+			{
+				fh->pasvCmd = "PASV";
+				continue;
+			}
+			else return ec;
+		}
+
+		ec = _f_get_final_resp(fh, &code, &resp);
+		if (ec)
+		{
+			if (strcmp(fh->pasvCmd,"PASV") != 0)
+			{
+				fh->pasvCmd = "PASV";
+				continue;
+			}
+			else return ec;
+		}
+
+		if (F_CODE_INTR(code) || F_CODE_ERR(code))
+		{
+			if (strcmp(fh->pasvCmd,"PASV") != 0)
+			{
+				fh->pasvCmd = "PASV";
+				continue;
+			}
+		}
+		break;
+	}
 
 	if (F_CODE_INTR(code))
 	{
 		ec = ec_create(EC_GSI_SUCCESS,
 		               EC_GSI_SUCCESS,
-		               "Bad response to PASV: %s",
+		               "Bad response to %s: %s",
+		               fh->pasvCmd,
 		               resp);
 		FREE(resp);
 		return ec;
@@ -3116,13 +3218,14 @@ _f_setup_pasv(fh_t * fh, fh_t * ofh, int retrieve)
 		return _f_setup_conntype(fh,  ofh, retrieve);
 	}
 
-	scnt = _f_parse_addrs(resp, &sinp);
+	scnt = _f_parse_addrs(fh, resp, &sinp);
 
 	if (scnt == 0)
 	{
 		ec = ec_create(EC_GSI_SUCCESS,
 		               EC_GSI_SUCCESS,
-		               "No addresses found in PASV response:\n%s",
+		               "No addresses found in %s response:\n%s",
+		               fh->pasvCmd,
 		               resp);
 		FREE(resp);
 		return ec;
@@ -3133,11 +3236,11 @@ _f_setup_pasv(fh_t * fh, fh_t * ofh, int retrieve)
 	{
 		/* Third party */
 		fh->scnt = scnt;
-		fh->sinp = sinp;
+		fh->sinp = (struct sockaddr *)sinp;
 		return ec;
 	}
 
-	ec = fh->dcs.dci.active(&fh->dcs, sinp, scnt);
+	ec = fh->dcs.dci.active(&fh->dcs, (struct sockaddr *)sinp, sizeof(struct sockaddr_storage), scnt);
 	FREE(sinp);
 	return ec;
 }
@@ -3166,15 +3269,24 @@ _f_setup_conntype(fh_t * fh, fh_t * ofh, int retrieve)
 
 static int
 _f_parse_addrs(
-    char                 *  str,
-	struct sockaddr_in  **  sinp)
+    fh_t * fh, char *  str,
+    struct sockaddr_storage  **  sinp)
 {
     char * ptr = NULL;
+    char *strc = NULL;
+    char delim;
+    char *token[3];
+    int n_tokens;
+    int protocol, port;
+    uint16_t htons_port;
     int x1, x2, x3, x4, x5, x6;
-	int cnt = 0;
+    int cnt = 0;
     int c;
 
     *sinp = NULL;
+
+    /* Try legacy format first (it can mimick the new one when  */
+    /* certain number combinations are found) */
     ptr = str;
     while ((ptr = strchr(ptr, ',')) != NULL)
     {
@@ -3186,16 +3298,16 @@ _f_parse_addrs(
         if (c == 6)
         {
             /* Match */
-            *sinp = (struct sockaddr_in *) realloc(
+            *sinp = (struct sockaddr_storage *) realloc(
 			              *sinp,
-                          (++cnt)*sizeof(struct sockaddr_in));
+                          (++cnt)*sizeof(struct sockaddr_storage));
 
-			(*sinp)[cnt-1].sin_family = AF_INET;
-			(*sinp)[cnt-1].sin_addr.s_addr = htonl(((x1 << 24) & 0xFF000000) |
+			(*sinp)[cnt-1].ss_family = AF_INET;
+			((struct sockaddr_in *)&(*sinp)[cnt-1])->sin_addr.s_addr = htonl(((x1 << 24) & 0xFF000000) |
 			                                       ((x2 << 16) & 0x00FF0000) |
 			                                       ((x3 <<  8) & 0x0000FF00) |
 			                                       ((x4 <<  0) & 0x000000FF));
-			(*sinp)[cnt-1].sin_port = htons(((x5 << 8) & 0xFF00) | 
+			((struct sockaddr_in *)&(*sinp)[cnt-1])->sin_port = htons(((x5 << 8) & 0xFF00) | 
 			                                ((x6 << 0) & 0x00FF));
 
             ptr = strchr(ptr, '\n');
@@ -3207,7 +3319,109 @@ _f_parse_addrs(
             ptr++;
         }
     }
-	return cnt;
+
+    if (cnt > 0) return cnt; /* No mixed format allowed. */
+
+    /* Now try RFC2428 format */
+    strc = strdup(str);
+    if (strc != NULL)
+    {
+	/* Locate the beginning of the extended address */
+	/* As we have to first locate delimiter, and the format of */
+	/* EPSV and SPAS replies is different, this is somewhat */
+	/* heuristic: find the ext address after the first open */
+	/* parenthesis or newline. */
+        ptr = strchr(strc,'(');
+	if (ptr == NULL) ptr = strchr(strc,'\n');
+        if (ptr != NULL)
+        {
+            ptr++;
+            while ((*ptr) == ' ' || (*ptr) == '\t' ) ptr++;
+            delim = *ptr;
+            ptr++;
+	}
+	while (ptr != NULL)
+	{
+            for (n_tokens = 0; n_tokens < 3; n_tokens++)
+            {
+                token[n_tokens] = ptr;
+                if ((ptr = strchr(ptr, delim)) == NULL) break;
+                *ptr = 0;
+                ptr++;
+            }
+            if (n_tokens == 3)
+            {
+                *sinp = (struct sockaddr_storage *) realloc(
+       	             *sinp,
+                     (++cnt)*sizeof(struct sockaddr_storage));
+                protocol = atoi(token[0]);
+                htons_port = htons(atoi(token[2]));
+                if (protocol == 1 || protocol == 2)
+                {
+                    if (protocol == 1)
+                    {
+                         (*sinp)[cnt-1].ss_family = AF_INET;
+                         inet_pton(AF_INET, token[1],
+                                   &(((struct sockaddr_in *)&(*sinp)[cnt-1])->sin_addr));
+                         ((struct sockaddr_in *)&(*sinp)[cnt-1])->sin_port = htons_port;
+                    } else {
+                         (*sinp)[cnt-1].ss_family = AF_INET6;
+                         inet_pton(AF_INET6, token[1],
+                                   &(((struct sockaddr_in6 *)&(*sinp)[cnt-1])->sin6_addr));
+                         ((struct sockaddr_in6 *)&(*sinp)[cnt-1])->sin6_port = htons_port;
+                    }
+                } else {
+                    /* No protocol specified */
+                    /* EPSV returns only the 'port' field, so */
+                    /* use the current control connection peer. */
+                    if (fh != NULL)
+                        net_getpeername(fh->cc.nh, (struct sockaddr *)(&((*sinp)[cnt-1])), sizeof(struct sockaddr_storage));
+                    if (((*sinp)[cnt-1]).ss_family == AF_INET)
+                       ((struct sockaddr_in *)&(*sinp)[cnt-1])->sin_port = htons_port;
+                    else if (((*sinp)[cnt-1]).ss_family == AF_INET6)
+                       ((struct sockaddr_in6 *)&(*sinp)[cnt-1])->sin6_port = htons_port;
+                }
+            }
+            if (ptr != NULL) ptr = strchr(ptr, delim);
+        }
+        free(strc);
+    }
+
+    return cnt;
+}
+
+static char *
+_f_rfc2428_extaddr(struct sockaddr *sinp)
+{
+	int protversion;
+        uint16_t port;
+	char delim = '|';
+	const char *addr;
+	char addrbuf[INET6_ADDRSTRLEN];
+
+	switch(sinp->sa_family)
+	{
+	 case AF_INET:
+		protversion = 1;
+		port = ((struct sockaddr_in *)sinp)->sin_port;
+		addr = inet_ntop(AF_INET, 
+			&(((struct sockaddr_in *)sinp)->sin_addr),
+			addrbuf, sizeof(addrbuf));
+		break;
+	 case AF_INET6:
+		protversion = 2;
+		port = ((struct sockaddr_in6 *)sinp)->sin6_port;
+		addr = inet_ntop(AF_INET6, 
+			&(((struct sockaddr_in6 *)sinp)->sin6_addr),
+			addrbuf, sizeof(addrbuf));
+		break;
+	 default:
+		return NULL;
+	}
+	return Sprintf(NULL, "%c%d%c%s%c%d%c", 
+			delim, protversion,
+			delim, addr,
+			delim, ntohs(port), delim);
 }
 
 static void
@@ -3425,7 +3639,7 @@ _f_connect(fh_t * fh, char ** srvrmsg)
 	char      * cptr  = NULL;
 	char      * token = NULL;
 	int         code  = 0;
-	struct sockaddr_in sin;
+	struct addrinfo * saddr, * caddr;
 
 	if (net_connected(fh->cc.nh))
 		return ec;
@@ -3443,11 +3657,17 @@ _f_connect(fh_t * fh, char ** srvrmsg)
 	if (!fh->rhost)
 		fh->rhost = Strdup(fh->host);
 
-	ec = net_translate(fh->rhost, fh->port, &sin);
+	ec = net_translate(fh->rhost, fh->port, &saddr);
 	if (ec != EC_SUCCESS)
 		goto cleanup;
 
-	ec = net_connect(&fh->cc.nh, &sin);
+	for (caddr = saddr; caddr != NULL; caddr = caddr->ai_next)
+	{
+		ec = net_connect(&fh->cc.nh, caddr->ai_addr, caddr->ai_addrlen);
+		if (ec == EC_SUCCESS) break;
+	}
+	freeaddrinfo(saddr);
+
 	if (ec != EC_SUCCESS)
 		goto cleanup;
 

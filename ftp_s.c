@@ -109,7 +109,7 @@ _f_s_poll(dch_t * dch)
 
 
 static errcode_t
-_f_s_active(dch_t * dch, struct sockaddr_in * sin, int scnt)
+_f_s_active(dch_t * dch, struct sockaddr * sin, socklen_t sin_len, int scnt)
 {
 	errcode_t ec = EC_SUCCESS;
 	dc_t    * dc = NULL;
@@ -118,7 +118,7 @@ _f_s_active(dch_t * dch, struct sockaddr_in * sin, int scnt)
 	memset(dc, 0, sizeof(dc_t));
 
 	/* Non blocking connect. */
-	ec = net_connect(&dc->nh, sin);
+	ec = net_connect(&dc->nh, sin, sin_len);
 	if (ec)
 	{
 		FREE(dch->privdata);
@@ -132,7 +132,7 @@ _f_s_active(dch_t * dch, struct sockaddr_in * sin, int scnt)
 
 
 static errcode_t
-_f_s_passive(dch_t * dch, struct sockaddr_in * sin)
+_f_s_passive(dch_t * dch, struct sockaddr * sin, socklen_t sin_len)
 {
 	errcode_t ec = EC_SUCCESS;
 	dc_t    * dc = NULL;
@@ -140,7 +140,7 @@ _f_s_passive(dch_t * dch, struct sockaddr_in * sin)
 	dch->privdata = dc = (dc_t*) malloc(sizeof(dc_t));
 	memset(dc, 0, sizeof(dc_t));
 
-	ec = net_listen(&dc->nh, sin);
+	ec = net_listen(&dc->nh, sin, sin_len);
 	if (ec)
 	{
 		FREE(dch->privdata);
