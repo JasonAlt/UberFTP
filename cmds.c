@@ -457,10 +457,12 @@ static cmd_t gcmdlist [] = {
 "file    Write listing to [file].\n"},
 
 	{ _c_lscos,       "llscos", C_A_LCH_1|C_A_NOARGS,
-"List the available COS on the local server (if supported).\n"},
+"List the available COS on the local server (if supported).\n",
+"llscos\n", NULL},
 
 	{ _c_lsfam,       "llsfam", C_A_LCH_1|C_A_NOARGS,
-"List the available families on the local server (if supported).\n"},
+"List the available families on the local server (if supported).\n",
+"llsfam\n", NULL},
 
 #ifdef MSSFTP
 	{ _c_rm,     "lmdelete", C_A_LCH_1|C_A_OPT_r|C_A_STRINGS,
@@ -522,10 +524,12 @@ static cmd_t gcmdlist [] = {
 "file    Write listing to [file].\n"},
 
 	{ _c_lscos,       "lscos", C_A_RCH_1|C_A_NOARGS,
-"List the available COS on the remote server (if supported).\n"},
+"List the available COS on the remote server (if supported).\n",
+"lscos\n", NULL},
 
 	{ _c_lsfam,       "lsfam", C_A_RCH_1|C_A_NOARGS,
-"List the available families on the remote server (if supported).\n"},
+"List the available families on the remote server (if supported).\n",
+"lsfam\n", NULL},
 
 	{ _c_size, "lsize", C_A_LCH_1|C_A_STRINGS,
 "Prints the size of the given object(s).\n",
@@ -3250,7 +3254,13 @@ _c_xfer(ch_t       * sch,
 			{
 			case 0:
 			case S_IFREG:
-				if (C_ISREG(dmlp->type) && !rflag && !msrcs)
+				/*
+				 * Allow us to map a regular file to:
+				 *  (1) a regular file if this is a single file transfer or
+				 *  (2) a device (like /dev/null)
+				 */
+				if ((C_ISREG(dmlp->type) && !rflag && !msrcs) ||
+				    (S_ISCHR(dmlp->type) || S_ISBLK(dmlp->type)))
 				{
 					target = Strdup(dmlp->name);
 					break;

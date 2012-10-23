@@ -111,6 +111,8 @@ typedef struct ftp_handle {
 	int hasSiteUtime;
 	int hasSiteLscos;
 	int hasSiteLsfam;
+	int hasSiteHln;
+	int hasSiteHardLinkToFrom;
 
 	/* Mlsx features */
 	mf_t mf;
@@ -224,6 +226,16 @@ _f_readdir_mlsd(pd_t * pd, char * path, ml_t *** mlp, char * token);
 static errcode_t
 _f_readdir_nlst(pd_t * pd, char * path, ml_t *** mlp, char * token);
 
+static int
+_f_ftp_code_unknown(char * FtpResponse)
+{
+	if (strcmp(FtpResponse, "500 Command not supported.\r\n") == 0)
+		return 1;
+	if (strcmp(FtpResponse, "500 Invalid command.\r\n") == 0)
+		return 1;
+	return 0;
+}
+
 static errcode_t
 ftp_connect(pd_t *  pd, 
             char *  host, 
@@ -261,20 +273,22 @@ ftp_connect(pd_t *  pd,
 		goto cleanup;
 
 	/* Set the default features. */
-    fh->hasChgrp       = 1;
-    fh->hasSiteSetfam  = 1;
-	fh->hasSiteSetCos  = 1;
-    fh->hasSiteSum     = 1;
-    fh->hasPasv        = 1;
-    fh->hasAllo        = 1;
-    fh->hasSize        = 1;
-    fh->hasSbuf        = 1;
-    fh->hasStage       = 1;
-    fh->hasSiteStage   = 1;
-    fh->hasMFMT        = 1;
-    fh->hasSiteUtime   = 1;
-	fh->hasSiteLscos   = 1;
-	fh->hasSiteLsfam   = 1;
+    fh->hasChgrp              = 1;
+    fh->hasSiteSetfam         = 1;
+	fh->hasSiteSetCos         = 1;
+    fh->hasSiteSum            = 1;
+    fh->hasPasv               = 1;
+    fh->hasAllo               = 1;
+    fh->hasSize               = 1;
+    fh->hasSbuf               = 1;
+    fh->hasStage              = 1;
+    fh->hasSiteStage          = 1;
+    fh->hasMFMT               = 1;
+    fh->hasSiteUtime          = 1;
+	fh->hasSiteLscos          = 1;
+	fh->hasSiteLsfam          = 1;
+	fh->hasSiteHln            = 1;
+	fh->hasSiteHardLinkToFrom = 1;
 
 	/* Now grab the feature set, if available. */
 	ec = _f_send_cmd(fh, "FEAT");
@@ -1435,7 +1449,7 @@ ftp_stat(pd_t * pd, char * path, ml_t ** mlp)
 	if (F_CODE_ERR(code))
 	{
 		/* Attempt to mask 'No such file or directory' */
-		if (strstr(resp, "No such file or directory"))
+		if (strstr(resp, "No such file or directory") || strstr(resp, "File not found"))
 		{
 			ec_destroy(ec);
 			ec = EC_SUCCESS;
@@ -1454,7 +1468,10 @@ ftp_stat(pd_t * pd, char * path, ml_t ** mlp)
 	if (ec)
 		goto cleanup;
 
+	/* Find the end of the first record. */
 	rec = strstr(resp, "\r\n ");
+
+	/* If we found a recond, find the end of the second record. */
 	if (rec)
 		eor = strstr(rec + 3, "\r\n");
 
@@ -1758,19 +1775,31 @@ ftp_cksum (pd_t * pd, char * file, int * supported, unsigned int * crc)
 errcode_t
 ftp_link (pd_t * pd, char * oldfile, char * newfile)
 {
-	errcode_t ec   = EC_SUCCESS;
-	fh_t    * fh   = (fh_t *) pd->ftppriv;
-	char    * cmd  = NULL;
-	char    * resp = NULL;
-	int       code = 0;
+	errcode_t ec         = EC_SUCCESS;
+	fh_t    * fh         = (fh_t *) pd->ftppriv;
+	char    * cmd        = NULL;
+	char    * resp       = NULL;
+	int       code       = 0;
+	int       first_pass = 1;
 
+	if (!fh->hasSiteHln && !fh->hasSiteHardLinkToFrom)
+		return ec_create(EC_GSI_SUCCESS,
+		                 EC_GSI_SUCCESS,
+		                 "Service does not support hardlinks");
+	
 	/* Reconnect */
 	ec = _f_reconnect(fh);
 	if (ec)
 		return ec;
 
+send_second_part:
 	/* Construct the command. */
-	cmd = Sprintf(NULL, "SITE HLN %s %s", oldfile, newfile);
+	if (fh->hasSiteHln)
+		cmd = Sprintf(NULL, "SITE HLN %s %s", oldfile, newfile);
+	else if (first_pass)
+		cmd = Sprintf(NULL, "SITE HardLinkFrom %s", oldfile);
+	else
+		cmd = Sprintf(NULL, "SITE HardLinkTo %s", newfile);
 
 	/* Send the command. */
 	ec = _f_send_cmd(fh, cmd);
@@ -1803,6 +1832,22 @@ ftp_link (pd_t * pd, char * oldfile, char * newfile)
 		return ec;
 	}
 
+	/* If the command was not recognized... */
+	if (_f_ftp_code_unknown(resp))
+	{
+		/* Free the response. */
+		FREE(resp);
+
+		if (fh->hasSiteHln)
+		{
+			fh->hasSiteHln = 0;
+			return ftp_link(pd, oldfile, newfile);
+		}
+
+		fh->hasSiteHardLinkToFrom = 0;
+		return ftp_link(pd, oldfile, newfile);
+	}
+
 	/* 400-599 */
 	if (F_CODE_ERR(code))
 	{
@@ -1824,6 +1869,12 @@ ftp_link (pd_t * pd, char * oldfile, char * newfile)
 
 	/* Free the response. */
 	FREE(resp);
+
+	if (!fh->hasSiteHln && first_pass)
+	{
+		first_pass = 0;
+		goto send_second_part;
+	}
 
 	/* Success! */
 	return EC_SUCCESS;
