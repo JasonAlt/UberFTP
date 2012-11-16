@@ -64,7 +64,7 @@
 #endif /* DMALLOC */
 
 typedef struct {
-	int fd;
+	int          fd;
 	globus_off_t len;
 	globus_off_t off;
 	pid_t        pid;
@@ -268,6 +268,7 @@ unix_stor(pd_t * pd,
 
 static errcode_t
 unix_read(pd_t          *  pd, 
+          pd_t          *  opd, /* The other side's private data pointer. */
           char          ** buf,
           globus_off_t  *  off,
           size_t        *  len,
@@ -305,7 +306,8 @@ unix_read(pd_t          *  pd,
 }
 
 static errcode_t 
-unix_write(pd_t * pd, 
+unix_write(pd_t          * pd, 
+           pd_t          * opd, /* The other side's private data pointer. */
            char          * buf, 
            globus_off_t    off, 
            size_t          len,
@@ -317,8 +319,13 @@ unix_write(pd_t * pd,
 	globus_off_t offset = 0;
 	errcode_t ec  = EC_SUCCESS;
 
+	/*
+	 * Ideally, I'd like to check that offset == off, but that doesn't work
+	 * if you are writing to /dev/null (at least on RHEL 6.2). In that case,
+	 * lseek() always returns 0.
+	 */
 	offset = lseek(uh->fd, off, SEEK_SET);
-	if (offset != off && errno != ESPIPE)
+	if (offset == (off_t)-1 && errno != ESPIPE)
 	{
 		FREE(buf);
 		if (offset == (globus_off_t)-1)
@@ -979,8 +986,10 @@ unix_utime(pd_t * pd, char * path, time_t timestamp)
 	/* Create the symbolic link. */
 	retval = utime(path, &utimbuf);
 
-	/* If it failed... */
-	if (retval != 0)
+	/*
+	 * Error on failure but not if it is because we do not own the file.
+	 */
+	if (retval != 0 && errno != EPERM)
 	{
 		/* Construct the error. */
 		ec = ec_create(EC_GSI_SUCCESS,

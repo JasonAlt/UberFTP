@@ -132,7 +132,6 @@ typedef struct ftp_handle {
 	char * cwd;  /* Current working directory. */
 
 	time_t keepalive;
-
 } fh_t;
 
 
@@ -145,6 +144,9 @@ _f_prep_dc(fh_t * fh,
            int    stream,
            int    binary,
            int    retrieve);
+
+static errcode_t
+_f_wait_resp(fh_t * fh1, fh_t * fth2);
 
 static errcode_t
 _f_poll_resp(fh_t * fh, int * code, char ** resp);
@@ -423,9 +425,11 @@ ftp_retr(pd_t * pd,
 
 	if (opd)
 		ofh = (fh_t *) opd->ftppriv;
-	fh->dcs.off = off;
+
+	/* Store to parital offset for adjusting transfer offsets later. */
+	fh->dcs.partial_off = off;
 	if (off == (globus_off_t)-1)
-		fh->dcs.off = 0;
+		fh->dcs.partial_off = 0;
 
 	if (len != -1 && !fh->hasEret)
 		return ec_create(EC_GSI_SUCCESS,
@@ -507,13 +511,18 @@ ftp_stor(pd_t * pd,
 	if (opd)
 		ofh = (fh_t *) opd->ftppriv;
 
+	/* Store to parital offset for adjusting transfer offsets later. */
+	fh->dcs.partial_off = off;
+	if (off == (globus_off_t)-1)
+		fh->dcs.partial_off = 0;
+
 	if (off != (globus_off_t)-1 && !fh->hasEret)
 		return ec_create(EC_GSI_SUCCESS,
 		                 EC_GSI_SUCCESS,
 		                 "Remote service does not support partial stores");
 
 	/* Send allo */
-	if (fh->hasAllo && len != -1 && off == (globus_off_t)-1)
+	if (fh->hasAllo && len != -1)
 	{
 		cmd = Sprintf(NULL, "ALLO %" GLOBUS_OFF_T_FORMAT, len);
 		ec  = _f_send_cmd(fh, cmd);
@@ -667,6 +676,7 @@ ftp_stor(pd_t * pd,
 
 static errcode_t
 ftp_read(pd_t          *  pd,
+         pd_t          *  opd, /* The other side's private data. */
          char          ** buf,
          globus_off_t  *  off,
          size_t        *  len,
@@ -675,12 +685,24 @@ ftp_read(pd_t          *  pd,
 	int         code  = 0;
 	int         ready = 0;
 	fh_t      * fh    = (fh_t *) pd->ftppriv;
+	fh_t      * ofh   = NULL;
 	char      * resp  = NULL;
 	errcode_t   ec    = EC_SUCCESS;
 
 	*buf = NULL;
 	*len = 0;
 	*eof = 0;
+
+	/* Check for a third-party transfer. */
+	if (opd && opd->ftppriv)
+	{
+		ofh = (fh_t *) opd->ftppriv;
+
+		/* Wait for someone to be ready. */
+		ec = _f_wait_resp(fh, ofh);
+		if (ec != EC_SUCCESS)
+			return ec;
+	}
 
 	do {
 		ec = _f_keepalive(fh);
@@ -712,6 +734,8 @@ ftp_read(pd_t          *  pd,
 			return ec;
 		}
 	} while (!(ec = fh->dcs.dci.read_ready(&fh->dcs, &ready)) && !ready);
+
+	/* Bail on error. */
 	if (ec)
 		return ec;
 
@@ -720,6 +744,7 @@ ftp_read(pd_t          *  pd,
 
 static errcode_t
 ftp_write(pd_t          * pd,
+          pd_t          * opd, /* The other side's private data. */
           char          * buf,
           globus_off_t    off,
           size_t          len,
@@ -728,8 +753,20 @@ ftp_write(pd_t          * pd,
 	int         code  = 0;
 	int         ready = 0;
 	fh_t      * fh    = (fh_t *) pd->ftppriv;
+	fh_t      * ofh   = NULL;
 	char      * resp  = NULL;
 	errcode_t   ec    = EC_SUCCESS;
+
+	/* Check for a third-party transfer. */
+	if (opd && opd->ftppriv)
+	{
+		ofh = (fh_t *) opd->ftppriv;
+
+		/* Wait for someone to be ready. */
+		ec = _f_wait_resp(fh, ofh);
+		if (ec != EC_SUCCESS)
+			return ec;
+	}
 
 	do {
 		ec = _f_keepalive(fh);
@@ -765,6 +802,8 @@ ftp_write(pd_t          * pd,
 		if (!fh->dcs.dci.write)
 			return ec;
 	} while (!(ec = fh->dcs.dci.write_ready(&fh->dcs, &ready)) && !ready);
+
+	/* Bail on error. */
 	if (ec)
 		return ec;
 
@@ -2451,6 +2490,33 @@ _f_prep_dc(fh_t * fh,
 	return ec;
 }
 
+static errcode_t
+_f_wait_resp(fh_t * fh1, fh_t * fh2)
+{
+	int       code = 0;
+	errcode_t ec   = EC_SUCCESS;
+
+	/* Check if this side has a response waiting. */
+	ec = _f_peak_resp(fh1, &code);
+	if (ec != EC_SUCCESS)
+		return ec;
+
+	/* If there was a response... */
+	if (code != 0)
+		return EC_SUCCESS;
+
+	/* Check if the other side has a response waiting. */
+	ec = _f_peak_resp(fh2, &code);
+	if (ec != EC_SUCCESS)
+		return ec;
+
+	/* If there was a response... */
+	if (code != 0)
+		return EC_SUCCESS;
+
+	return net_wait(fh1->cc.nh, fh2->cc.nh, -1);
+}
+
 /*
  * Pops error responses, not successful responses.
  */
@@ -3713,7 +3779,7 @@ _f_readdir_mlsd(pd_t * pd, char * path, ml_t *** mlp, char * token)
 
 	while (!eof)
 	{
-		ec = ftp_read(pd, &buf, &off, &len, &eof);
+		ec = ftp_read(pd, NULL, &buf, &off, &len, &eof);
 		if (ec)
 			break;
 
@@ -3853,7 +3919,7 @@ _f_readdir_nlst(pd_t * pd, char * path, ml_t *** mlpp, char * token)
 
 	while (!eof)
 	{
-		ec = ftp_read(pd, &buf, &off, &len, &eof);
+		ec = ftp_read(pd, NULL, &buf, &off, &len, &eof);
 		if (ec)
 			break;
 

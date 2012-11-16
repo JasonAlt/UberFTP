@@ -66,12 +66,14 @@ errcode_t l_disconnect(lh_t, char ** msg);
 errcode_t l_retrvfile(lh_t, lh_t, char *, globus_off_t, globus_off_t);
 errcode_t l_storfile(lh_t, lh_t, char *, int, globus_off_t, globus_off_t);
 errcode_t l_appefile(lh_t);
-errcode_t l_read(lh_t, 
+errcode_t l_read(lh_t,  /* Logical handle to read. */
+                 lh_t,  /* Other logical handle. */
                  char          ** buf, 
                  globus_off_t  *, 
                  size_t         *, 
                  int           * eof);
-errcode_t l_write(lh_t,
+errcode_t l_write(lh_t, /* logical handle to write. */
+                  lh_t, /* Other logical handle. */
                   char          * buf,
                   globus_off_t    off,
                   size_t          len,

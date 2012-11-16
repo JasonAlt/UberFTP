@@ -39,6 +39,23 @@
  * DEALINGS WITH THE SOFTWARE.
  */
 
+/*
+ * NOTE ABOUT FILE/TRANSFER OFFSETS IN EXTENDED BLOCK MODE
+ *
+ * The offset used for sending/receiving buffers in extended block mode
+ * should be the transfer offset (starting at 0 regardless of starting
+ * file offset). If the transfer is a restart, the first offset received
+ * will not be zero but only because it is a restart!
+ * 
+ *   STOR <file>             - Offset 0, 1, 2
+ *   ESTO <off> <len> <file> - Offset 0, 1, 2 (receiver should add <off>)
+ *   REST <off1>-<off2>      - Offset 0-off1, off2, ...
+ *   REST 0-<off1>           - Offset off1, off1+1, ...
+ *
+ *  This was determined by watching globus-url-copy and globus-gridftp-server
+ *  in GT 5.2.3rc2.
+ */
+
 #include <stdlib.h>
 
 #include "settings.h"
@@ -330,6 +347,8 @@ _f_eb_read(dch_t        * dch,
 		dc->buflen = 0;
 	}
 
+	*off += dch->partial_off;
+
 	if (dc->eod == 1 && dc->count == 0)
 	{
 		/* Mark the channel as EOD. */
@@ -398,6 +417,8 @@ _f_eb_write(dch_t        * dch,
 	dc_t    * dc   = NULL;
 	ebpd_t  * ebpd = (ebpd_t *) dch->privdata;
 	int       i    = 0;
+
+	off -= dch->partial_off;
 
 	if (buf && len)
 	{

@@ -200,7 +200,7 @@ _f_s_read(dch_t         * dch,
 
 	ec = gsi_dc_read(dc->gh, dc->nh, buf, len, eof);
 
-	*off = dc->off + dch->off;
+	*off = dc->off + dch->partial_off;
 	dc->off += *len;
 
 	return ec;

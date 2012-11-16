@@ -1456,7 +1456,7 @@ retry:
 			eof = 0;
 			while (ec == EC_SUCCESS && !eof)
 			{
-				ec = l_read(ch->lh, &buf, &off, &len, &eof);
+				ec = l_read(ch->lh, NULL, &buf, &off, &len, &eof);
 				if (ec == EC_SUCCESS && buf != NULL)
 				{
 					o_fwrite(stdout, DEBUG_ERRS_ONLY, buf, len);
@@ -3457,8 +3457,7 @@ _c_xfer_file(ch_t * sch,
 		gettimeofday(&start, NULL);
 		while (!eof)
 		{
-			ec = l_read(sch->lh, &buf, &off, &len, &eof);
-
+			ec = l_read(sch->lh, dch->lh, &buf, &off, &len, &eof);
 			if (ec)
 			{
 				if (hashnl)
@@ -3473,8 +3472,7 @@ _c_xfer_file(ch_t * sch,
 				break;
 			}
 
-			ec = l_write(dch->lh, buf, off, len, eof);
-
+			ec = l_write(dch->lh, sch->lh, buf, off, len, eof);
 			if (ec)
 			{
 				if (hashnl)
@@ -3804,7 +3802,7 @@ retry:
 
 	while (ec == EC_SUCCESS && !eof)
 	{
-		ec = l_read(ch->lh, &buf, &off, &len, &eof);
+		ec = l_read(ch->lh, NULL, &buf, &off, &len, &eof);
 		if (!ec && buf)
 			o_fwrite(outf, DEBUG_ERRS_ONLY, buf, len);
 		FREE(buf);

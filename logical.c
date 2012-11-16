@@ -151,30 +151,34 @@ l_appefile(lh_t);
 
 errcode_t
 l_read(lh_t lh, 
+       lh_t olh,
        char          ** buf, 
        globus_off_t  *  off,
        size_t        *  len,
        int           *  eof)
 {
-	return lh->li.read(&lh->privdata,
-	                    buf,
-	                    off,
-	                    len,
-	                    eof);
+	pd_t * opd = NULL;
+
+	if (olh)
+		opd = &olh->privdata;
+
+	return lh->li.read(&lh->privdata, opd, buf, off, len, eof);
 }
 
 errcode_t
 l_write(lh_t lh,
+        lh_t olh,
         char          * buf,
         globus_off_t    off,
         size_t          len,
         int             eof)
 {
-	return lh->li.write(&lh->privdata,
-	                    buf,
-	                    off,
-	                    len,
-	                    eof);
+	pd_t * opd = NULL;
+
+	if (olh)
+		opd = &olh->privdata;
+
+	return lh->li.write(&lh->privdata, opd, buf, off, len, eof);
 }
 
 errcode_t

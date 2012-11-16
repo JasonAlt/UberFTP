@@ -542,6 +542,44 @@ net_write_nb(nh_t * nh, char * buf, size_t * count)
 }
 
 errcode_t
+net_wait(nh_t * nh1, nh_t * nh2, int timeout)
+{
+	int rval  = 0;
+	int count = 0;
+	struct pollfd ufd[2];
+
+	if (nh1->state != NET_STATE_CLOSED && nh1->state != NET_STATE_CLOSING)
+	{
+		ufd[count].fd        = nh1->fd;
+		ufd[count].events    = POLLIN;
+		ufd[count++].revents = 0;
+	}
+
+	if (nh2->state != NET_STATE_CLOSED && nh2->state != NET_STATE_CLOSING)
+	{
+		ufd[count].fd        = nh2->fd;
+		ufd[count].events    = POLLIN;
+		ufd[count++].revents = 0;
+	}
+
+	/* If both handles are closed... */
+	if (count == 0)
+		return EC_SUCCESS;
+
+	do {
+		rval = poll(ufd, count, timeout);
+	} while (rval == -1 && errno == EINTR);
+
+	if (rval == -1)
+		return ec_create(EC_GSI_SUCCESS,
+		                 EC_GSI_SUCCESS,
+		                 "poll() failed: %s",
+		                 strerror(errno));
+
+	return EC_SUCCESS;
+}
+
+errcode_t
 net_poll(nh_t * nh, int * read, int * write, int timeout)
 {
 	int rval = 0;
