@@ -1,4 +1,4 @@
-Version 2.7 11/16/12
+Version 2.7 11/26/12
 	- Added a patch from Craig Tierney of NOAA to allow file size suffixes
 	  'K', 'M', 'G' and 'T' so that values can be converted to kibibytes,
 	  mebibytes, gibibytes and tebibytes, respectively. The chance has been
