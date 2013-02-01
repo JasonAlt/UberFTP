@@ -3005,6 +3005,7 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 	int       scnt = 1;
 	char    * cmd  = NULL;
 	char    * resp = NULL;
+	char    * addr = NULL;
 	struct sockaddr_in   sin;
 	struct sockaddr_in * sinp = NULL;
 
@@ -3027,17 +3028,24 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 		sinp = &sin;
 	}
 
+	cmd = Strdup("SPOR");
+
 	for (i = 0; i < scnt; i++)
 	{
-		cmd = Sprintf(cmd, 
-		             "SPOR %d,%d,%d,%d,%d,%d",
-		             (ntohl(sinp[i].sin_addr.s_addr) >> 24) & 0xFF,
-		             (ntohl(sinp[i].sin_addr.s_addr) >> 16) & 0xFF,
-		             (ntohl(sinp[i].sin_addr.s_addr) >>  8) & 0xFF,
-		             (ntohl(sinp[i].sin_addr.s_addr) >>  0) & 0xFF,
-		             (ntohs(sinp[i].sin_port) >> 8) & 0xFF,
-		             (ntohs(sinp[i].sin_port) >> 0) & 0xFF);
+		addr = Sprintf(addr, 
+		               " %d,%d,%d,%d,%d,%d",
+		               (ntohl(sinp[i].sin_addr.s_addr) >> 24) & 0xFF,
+		               (ntohl(sinp[i].sin_addr.s_addr) >> 16) & 0xFF,
+		               (ntohl(sinp[i].sin_addr.s_addr) >>  8) & 0xFF,
+		               (ntohl(sinp[i].sin_addr.s_addr) >>  0) & 0xFF,
+		               (ntohs(sinp[i].sin_port) >> 8) & 0xFF,
+		               (ntohs(sinp[i].sin_port) >> 0) & 0xFF);
+
+		cmd = Strcat(cmd, addr);
+
 	}
+
+	FREE(addr);
 
 	ec = _f_send_cmd(fh, cmd);
 	FREE(cmd);

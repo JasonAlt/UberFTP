@@ -1,3 +1,7 @@
+Version 2.11 (RC1)
+	- Fixed SPOR response during striped third party transfers. SPOR will
+	  pass all addresses returned from SPAS.
+
 Version 2.10 11/16/12
 	- Added a patch from Craig Tierney of NOAA to allow file size suffixes
 	  'K', 'M', 'G' and 'T' so that values can be converted to kibibytes,
