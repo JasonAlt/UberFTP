@@ -74,11 +74,13 @@ typedef struct logical_interface {
 	                      globus_off_t);
 	errcode_t (*appefile)(pd_t *);
 	errcode_t (*read)(pd_t *, 
+	                  pd_t *,
 	                  char          ** buf, 
 	                  globus_off_t  *  off, 
 	                  size_t        *  len,
 	                  int           *  eof);
 	errcode_t (*write)(pd_t *, 
+	                   pd_t *,
 	                   char          * buf, 
 	                   globus_off_t    off, 
 	                   size_t          len,

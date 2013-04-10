@@ -1,4 +1,8 @@
-Version 2.10 7/11/11
+Version 2.11 (RC1)
+	- Fixed SPOR response during striped third party transfers. SPOR will
+	  pass all addresses returned from SPAS.
+
+Version 2.10 11/16/12
 	- Added a patch from Craig Tierney of NOAA to allow file size suffixes
 	  'K', 'M', 'G' and 'T' so that values can be converted to kibibytes,
 	  mebibytes, gibibytes and tebibytes, respectively. The chance has been
@@ -31,6 +35,11 @@ Version 2.10 7/11/11
 	- Fixed reverse DNS looks for GSI name comparison.
 	- Added new commands lscos/llscos to list available classes of service and
 	  lsfam/llsfam to list available tape families.
+	- Added hardlink support for the latest HPSS DSI
+	- Added the ability 'put <file> /dev/null'.
+	- Support ALLO with ESTO (partial store).
+	- Fixed offsets for partial transfers (pget,pput) in extended block mode (mode e)
+	- Fixed 100% CPU usage during slow and 3rd party transfers.
 
 Version 2.9 8/5/10
 	- Fixed a segfault found on a UV10 running SLES11. The crash occurs

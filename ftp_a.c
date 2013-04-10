@@ -208,7 +208,7 @@ _f_a_read(dch_t         * dch,
 		(*len)--;
 	}
 
-	*off = dc->off + dch->off;
+	*off = dc->off + dch->partial_off;
 	dc->off += *len;
 
 	return ec;

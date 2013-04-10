@@ -90,7 +90,7 @@ GetRealHostName(char * host)
 	                 sizeof(name),
 	                 NULL,
 	                 0,
-	                 0);
+	                 NI_NAMEREQD);
 
 	freeaddrinfo(res);
 	if (rc)

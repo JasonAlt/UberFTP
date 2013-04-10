@@ -1,7 +1,7 @@
 dnl
 dnl  University of Illinois/NCSA Open Source License
 dnl
-dnl  Copyright © 2003-2012, NCSA.  All rights reserved.
+dnl  Copyright © 2003-2013, NCSA.  All rights reserved.
 dnl
 dnl  Developed by:
 dnl
@@ -42,11 +42,11 @@ dnl
 dnl Process this file with autoconf to produce a configure script.
 # First [] is used as the prompt
 # Last [] is used for the version information
-AC_INIT(UberFTP (2.7 BETA 3), [2.7_BETA_3], [Jason Alt <jalt@ncsa.uiuc.edu>],[uberftp-client])
+AC_INIT(UberFTP (2.8 RC1), [2.8_RC1], [Jason Alt <jalt@ncsa.illinois.edu>],[uberftp-client])
 AM_INIT_AUTOMAKE 
 
 GPT_MAJOR="2"
-GPT_MINOR="7"
+GPT_MINOR="8"
 AC_SUBST(GPT_MAJOR)
 AC_SUBST(GPT_MINOR)
 AC_OUTPUT(pkg_data_src.gpt)
