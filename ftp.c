@@ -2654,8 +2654,16 @@ _f_get_resp(fh_t * fh, int * code, char ** resp)
 				break;
 		}
 
+		/* If we are trying to get a response but the server has already
+		 * closed the connection...
+		 */
 		if (fh->cc.eof)
-			break;
+		{
+			return ec_create(EC_GSI_SUCCESS,
+			                 EC_GSI_SUCCESS,
+			                 "Remote server has disconnected");
+		}
+
 
 		if ((fh->cc.cnt + s_blocksize()) > fh->cc.len)
 		{
