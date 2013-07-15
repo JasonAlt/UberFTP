@@ -1,6 +1,9 @@
-Version 2.11 (RC1)
+Version 2.11 (RC3)
 	- Fixed SPOR response during striped third party transfers. SPOR will
 	  pass all addresses returned from SPAS.
+	- Fixed hang on server disconnect
+	- On failure, do not attempt to remove destination file if it is a
+	  block or character device
 
 Version 2.10 11/16/12
 	- Added a patch from Craig Tierney of NOAA to allow file size suffixes
