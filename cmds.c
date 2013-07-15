@@ -3364,6 +3364,7 @@ _c_xfer_file(ch_t * sch,
 	int             retry   = s_retry();
 	int             eof     = 0;
 	int             supported = 0;
+	ml_t          * dmlp    = NULL;
 	char          * buf     = NULL;
 	char          * tim     = NULL;
 	char          * rate    = NULL;
@@ -3543,7 +3544,17 @@ cleanup:
 	/* Remove the destination on error. */
 	if (cr != CMD_SUCCESS && delfile)
 	{
-		ec = l_rm(dch->lh, dst);
+		/* Stat the file. */
+		ec = l_stat(dch->lh, dst, &dmlp);
+
+		/* If we successfully stat'ed the file... */
+		if (!ec && dmlp)
+		{
+			/* If it is not a character or block device... */
+			if (!(S_ISCHR(dmlp->type) || S_ISBLK(dmlp->type)))
+				ec = l_rm(dch->lh, dst);
+		}
+
 		if (ec)
 			o_fprintf(stderr,
 			          DEBUG_ERRS_ONLY,
@@ -3551,6 +3562,7 @@ cleanup:
 
 		ec_print(ec);
 		ec_destroy(ec);
+		ml_delete(dmlp);
 	}
 
 	if (cr == CMD_SUCCESS)
