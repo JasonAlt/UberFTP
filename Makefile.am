@@ -1,7 +1,7 @@
 ##########################################################################
 # University of Illinois/NCSA Open Source License
 #
-# Copyright Â© 2003-2008, NCSA.  All rights reserved.
+# Copyright © 2003-2014, NCSA.  All rights reserved.
 #
 # Developed by:
 #
@@ -39,16 +39,6 @@
 # DEALINGS WITH THE SOFTWARE.
 ############################################################################
 
-# SUBDIRS is an automake macro which contains 
-# the list of subdirectories that have Makefile.am's
-SUBDIRS=
-
-# Sources contains all of the source files in the directory.
-# Header files are included because automake will generate dependency targets 
-# for them and include them in a source distribution.
-#
-# If this directory builds multiple programs or libraries than these sources
-# will need to be seperated into seperate macros.
 Sources= \
 	cmds.c     filetree.c   ftp_s.h       logical.c  network.c  radix.h    \
 	cmds.h     filetree.h   gsi.c         logical.h  network.h  settings.c \
@@ -59,27 +49,6 @@ Sources= \
 	ml.h       cksum.c      cksum.h       perf.c     perf.h
 
 uberftp_SOURCES=$(Sources)
-uberftp_LDFLAGS=@GLOBUS_LDFLAGS@
-uberftp_LDADD=@GLOBUS_PKG_LIBS@
-uberftp_CFLAGS=@GLOBUS_CFLAGS@ @GLOBUS_CPPFLAGS@
 bin_PROGRAMS=uberftp
 man_MANS=uberftp.1
 
-#cmds2man_SOURCES=$(Sources)
-#cmds2man_LDFLAGS=@GLOBUS_LDFLAGS@
-#cmds2man_LDADD=@GLOBUS_LIBS@
-#cmds2man_CFLAGS=@GLOBUS_CFLAGS@
-
-srcpkg: distdir
-	-cp pkg_data_src.gpt $(distdir)
-	-cp Changelog $(distdir)
-	-cp Changelog.mssftp $(distdir)
-	-cp copyright $(distdir)
-	-cp filelist $(distdir)
-	-cp uberftp.1 $(distdir)
-	-cp mssftp.1 $(distdir)
-	-chmod -R a+r $(distdir)
-	tar chozf $(distdir).tar.gz $(distdir)
-	-rm -rf $(distdir)
-
-gpt-install: install
