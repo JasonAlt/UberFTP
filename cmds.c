@@ -3376,12 +3376,22 @@ _c_xfer_file(ch_t * sch,
 	unsigned int    lcrc    = 0;
 	unsigned int    rcrc    = 0;
 
-	/* Try to get the size of the remote file. */
+	/*
+	 * If we are sending the entire file, get the size of the remote file.
+	 */
 	if (slen == (globus_off_t)-1)
 	{
 		C_RETRY(ec, l_size(sch->lh, src, &slen));
-		ec_destroy(ec);
-		ec = EC_SUCCESS;
+		if (ec)
+		{
+			o_fprintf(stderr,
+			          DEBUG_ERRS_ONLY,
+			          "%s: Failed to get file size.\n",
+			          src);
+			ec_print(ec);
+			ec_destroy(ec);
+			return CMD_ERR_GET;
+		}
 	}
 
 	/* Stage it */
@@ -3567,32 +3577,9 @@ cleanup:
 
 	if (cr == CMD_SUCCESS)
 	{
-#ifdef NOT
-		/*
-		 * I'm not sure under what circumstances 'total' would be zero given
-		 * the code above. But I do know it is breaking the report for
-		 *   pput 0 0 file
-		 */
-		if (total == 0)
-		{
-			if (slen != -1)
-				total = slen;
-		}
-
-		if (total == 0)
-		{
-			C_RETRY(ec, l_size(sch->lh, src, &total));
-			if (ec)
-			{
-				ec_destroy(ec);
-				C_RETRY(ec, l_size(dch->lh, dst, &total));
-			}
-			ec_destroy(ec);
-		}
-#endif /* NOT */
-		buf   = Sprintf(NULL, "%"GLOBUS_OFF_T_FORMAT" bytes", total);
+		buf   = Sprintf(NULL, "%"GLOBUS_OFF_T_FORMAT" bytes", slen);
 		tim   = Convtime(&start, &stop);
-		rate  = MkRate(&start, &stop, total);
+		rate  = MkRate(&start, &stop, slen);
 
 		o_fprintf(stdout,
 		          DEBUG_NORMAL,
@@ -3611,7 +3598,7 @@ cleanup:
 
 #ifdef SYSLOG_PERF
 	if (cr == CMD_SUCCESS)
-		record_perf(sch->lh, dch->lh, src, dst, total);
+		record_perf(sch->lh, dch->lh, src, dst, slen);
 #endif /* SYSLOG_PERF */
 
 	if (cr == CMD_SUCCESS && s_cksum() && *dst != '|' && *src != '|')
