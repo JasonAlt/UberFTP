@@ -3372,7 +3372,6 @@ _c_xfer_file(ch_t * sch,
 	struct timeval  stop;
 	size_t          len     = 0;
 	globus_off_t    off     = 0;
-	globus_off_t    total   = 0;
 	unsigned int    lcrc    = 0;
 	unsigned int    rcrc    = 0;
 
@@ -3497,7 +3496,6 @@ _c_xfer_file(ch_t * sch,
 				          dst);
 				break;
 			}
-			total += len;
 
 			if (s_hash())
 			{
