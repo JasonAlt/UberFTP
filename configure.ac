@@ -125,7 +125,11 @@ fi
 # Now check for globus_common.h using globus_config.h's location
 #
 CPPFLAGS="-I/$globus_location/include/globus $GLOBUS_CONFIG_CPPFLAGS"
-AC_CHECK_HEADERS([globus_common.h], [], [AC_MSG_ERROR(globus_config.h not found)])
+AC_CHECK_HEADERS([globus_common.h], 
+                 [GLOBUS_COMMON_CPPFLAGS="-I/$globus_location/include/globus"], 
+                 [AC_MSG_ERROR(globus_common.h not found)])
+
+CPPFLAGS="$GLOBUS_CONFIG_CPPFLAGS $GLOBUS_COMMON_CPPFLAGS"
 
 #
 # Find the needed Globus libraries

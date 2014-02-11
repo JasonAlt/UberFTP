@@ -4254,13 +4254,15 @@ if test "x$ac_cv_header_globus_common_h" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_GLOBUS_COMMON_H 1
 _ACEOF
-
+ GLOBUS_COMMON_CPPFLAGS="-I/$globus_location/include/globus"
 else
-  as_fn_error $? "globus_config.h not found" "$LINENO" 5
+  as_fn_error $? "globus_common.h not found" "$LINENO" 5
 fi
 
 done
 
+
+CPPFLAGS="$GLOBUS_CONFIG_CPPFLAGS $GLOBUS_COMMON_CPPFLAGS"
 
 #
 # Find the needed Globus libraries
