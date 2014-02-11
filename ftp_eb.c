@@ -791,7 +791,7 @@ _f_eb_push_eod(ebpd_t * ebpd, dc_t * dc)
         errcode_t  ec = EC_SUCCESS;
 	/* 0x08 = EOD */
 	/* 0x04 = Close data channel . */
-	char * header = _f_eb_header(0x08|0x40, 0, 0);
+	char * header = _f_eb_header(0x08|0x04, 0, 0);
 
 	ec = gsi_dc_write(dc->gh, dc->nh, header, EB_HEADER_LEN, 0);
 	dc->state = DC_STATE_FLUSH_EOD;
