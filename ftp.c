@@ -3020,6 +3020,7 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 	int       scnt = 1;
 	char    * cmd  = NULL;
 	char    * resp = NULL;
+	char    * addr = NULL;
 	char    * extaddr;
 	struct sockaddr_storage   sin;
 	struct sockaddr * sinp = NULL;
@@ -3054,11 +3055,11 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 		{
 			/* SPOR supports both old and new address syntaxes */
 			extaddr = _f_rfc2428_extaddr((struct sockaddr *)&sinp[i]);
-			cmd = Sprintf(cmd, "SPOR %s", extaddr);
+			addr = Sprintf(addr, " %s", extaddr);
 			FREE(extaddr);
 		} else {
-			cmd = Sprintf(cmd, 
-		             "SPOR %d,%d,%d,%d,%d,%d",
+			addr = Sprintf(addr, 
+		             " %d,%d,%d,%d,%d,%d",
 		             (ntohl(((struct sockaddr_in *)&sinp[i])->sin_addr.s_addr) >> 24) & 0xFF,
 		             (ntohl(((struct sockaddr_in *)&sinp[i])->sin_addr.s_addr) >> 16) & 0xFF,
 		             (ntohl(((struct sockaddr_in *)&sinp[i])->sin_addr.s_addr) >>  8) & 0xFF,
@@ -3066,6 +3067,8 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 		             (ntohs(((struct sockaddr_in *)&sinp[i])->sin_port) >> 8) & 0xFF,
 		             (ntohs(((struct sockaddr_in *)&sinp[i])->sin_port) >> 0) & 0xFF);
 		}
+
+		cmd = Strcat(cmd, addr);
 	}
 
 	FREE(addr);
