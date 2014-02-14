@@ -3021,7 +3021,6 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 	char    * cmd  = NULL;
 	char    * resp = NULL;
 	char    * addr = NULL;
-	char    * extaddr;
 	struct sockaddr_storage   sin;
 	struct sockaddr * sinp = NULL;
 
@@ -3054,9 +3053,7 @@ _f_setup_spor(fh_t * fh, fh_t * ofh)
 		if (sinp[i].sa_family == AF_INET6) 
 		{
 			/* SPOR supports both old and new address syntaxes */
-			extaddr = _f_rfc2428_extaddr((struct sockaddr *)&sinp[i]);
-			addr = Sprintf(addr, " %s", extaddr);
-			FREE(extaddr);
+			addr = _f_rfc2428_extaddr((struct sockaddr *)&sinp[i]);
 		} else {
 			addr = Sprintf(addr, 
 		             " %d,%d,%d,%d,%d,%d",
@@ -3210,7 +3207,7 @@ _f_setup_port(fh_t * fh, fh_t * ofh)
 	{
 		extaddr = _f_rfc2428_extaddr((struct sockaddr *)&sin);
 		/* Use EPRT for IPv6 only (for the time being) */
-		cmd = Sprintf(cmd, "EPRT %s", extaddr);
+		cmd = Sprintf(cmd, "EPRT%s", extaddr);
 		FREE(extaddr);
 
 	} else {
@@ -3550,7 +3547,7 @@ _f_rfc2428_extaddr(struct sockaddr *sinp)
 	 default:
 		return NULL;
 	}
-	return Sprintf(NULL, "%c%d%c%s%c%d%c", 
+	return Sprintf(NULL, " %c%d%c%s%c%d%c", 
 			delim, protversion,
 			delim, addr,
 			delim, ntohs(port), delim);
