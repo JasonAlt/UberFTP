@@ -80,7 +80,8 @@ nc_stor(pd_t * pd,
 }
 
 static errcode_t
-nc_read(pd_t * pd, 
+nc_read(pd_t          *  pd, 
+        pd_t          *  opd,
         char          ** buf,
         globus_off_t  *  off,
         size_t        *  len,
@@ -90,7 +91,8 @@ nc_read(pd_t * pd,
 }
 
 static errcode_t 
-nc_write(pd_t * pd, 
+nc_write(pd_t          * pd, 
+         pd_t          * opd,
          char          * buf, 
          globus_off_t    off, 
          size_t          len,

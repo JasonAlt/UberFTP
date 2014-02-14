@@ -446,34 +446,41 @@ _f_eb_write(dch_t        * dch,
 	if (!eof)
 		return ec;
 
-	/* Find someone to send EOF */
-	for (dc = NULL; !dc; )
+	/* Flush data. Send EOF once to each server. */
+	for (i = 0; i < ebpd->dccnt; i += s_parallel())
 	{
-		ec = _f_eb_poll(dch);
-		if (ec)
-			return ec;
-
-		for (i = 0; !dc && i < ebpd->dccnt; i++)
+		while (ebpd->dcs[i].state != DC_STATE_READY)
 		{
-			if (ebpd->dcs[i].state == DC_STATE_READY)
-				dc = &ebpd->dcs[i];
+			ec = _f_eb_poll(dch);
+			if (ec)
+				return ec;
+		}
+		ebpd->dcs[i].state = DC_STATE_PUSH_EOF;
+	}
+
+	/* Flush EOF. Send EOD. */
+	for (i = 0; i < ebpd->dccnt; i++)
+	{
+		while (ebpd->dcs[i].state != DC_STATE_READY)
+		{
+			ec = _f_eb_poll(dch);
+			if (ec)
+				return ec;
+		}
+		ebpd->dcs[i].state = DC_STATE_PUSH_EOD;
+	}
+
+	/* Flush EOD. */
+	for (i = 0; i < ebpd->dccnt; i++)
+	{
+		while (ebpd->dcs[i].state != DC_STATE_EOD)
+		{
+			ec = _f_eb_poll(dch);
+			if (ec)
+				return ec;
 		}
 	}
-	dc->state = DC_STATE_PUSH_EOF;
 
-	/* Loop until done. */
-	while (ebpd->eods != ebpd->dccnt)
-	{
-		ec = _f_eb_poll(dch);
-		if (ec)
-			return ec;
-
-		for (i = 0; i < ebpd->dccnt; i++)
-		{
-			if (ebpd->dcs[i].state == DC_STATE_READY)
-				ebpd->dcs[i].state = DC_STATE_PUSH_EOD;
-		}
-	}
 	return ec;
 }
 
@@ -781,8 +788,10 @@ _f_eb_push_header(ebpd_t * ebpd, dc_t * dc)
 static errcode_t
 _f_eb_push_eod(ebpd_t * ebpd, dc_t * dc)
 {
-	errcode_t  ec = EC_SUCCESS;
-	char * header = _f_eb_header(0x08, 0, 0);
+        errcode_t  ec = EC_SUCCESS;
+	/* 0x08 = EOD */
+	/* 0x04 = Close data channel . */
+	char * header = _f_eb_header(0x08|0x04, 0, 0);
 
 	ec = gsi_dc_write(dc->gh, dc->nh, header, EB_HEADER_LEN, 0);
 	dc->state = DC_STATE_FLUSH_EOD;
@@ -793,7 +802,7 @@ static errcode_t
 _f_eb_push_eof(ebpd_t * ebpd, dc_t * dc)
 {
 	errcode_t  ec = EC_SUCCESS;
-	char * header = _f_eb_header(0x40, 0, ebpd->dccnt);
+	char * header = _f_eb_header(0x40, 0, s_parallel());
 
 	ec = gsi_dc_write(dc->gh, dc->nh, header, EB_HEADER_LEN, 0);
 	dc->state = DC_STATE_FLUSH_EOF;

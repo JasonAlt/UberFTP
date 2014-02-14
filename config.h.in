@@ -6,13 +6,53 @@
 /* Setting the default TCP window settings */
 #undef DEFAULT_TCP_BUFFER_SIZE
 
+/* Define to 1 if you have the <globus_common.h> header file. */
+#undef HAVE_GLOBUS_COMMON_H
+
+/* Define to 1 if you have the <globus_config.h> header file. */
+#undef HAVE_GLOBUS_CONFIG_H
+
+/* Define to 1 if you have the <inttypes.h> header file. */
+#undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the `globus_common' library (-lglobus_common). */
+#undef HAVE_LIBGLOBUS_COMMON
+
+/* Define to 1 if you have the `globus_gssapi_gsi' library
+   (-lglobus_gssapi_gsi). */
+#undef HAVE_LIBGLOBUS_GSSAPI_GSI
+
+/* Define to 1 if you have the <memory.h> header file. */
+#undef HAVE_MEMORY_H
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H
+
+/* Define to 1 if you have the <strings.h> header file. */
+#undef HAVE_STRINGS_H
+
+/* Define to 1 if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
 /* Define to 1 if you have the `strtoll' function. */
 #undef HAVE_STRTOLL
+
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have the <unistd.h> header file. */
+#undef HAVE_UNISTD_H
 
 /* Whether to build in mssftp functionality */
 #undef MSSFTP
 
-/* Mssftp will use a GSI service cert */
+/* mssftp will use a GSI service cert */
 #undef MSSFTP_GSI_SERVICE
 
 /* MSS to connect to */
@@ -33,8 +73,14 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* Define to 1 if you have the ANSI C header files. */
+#undef STDC_HEADERS
 
 /* Version number of package */
 #undef VERSION
