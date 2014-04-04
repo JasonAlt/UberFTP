@@ -94,6 +94,15 @@ AC_DEFINE_UNQUOTED(DEFAULT_BLKSIZE, $default_blksize, [ Setting the default buff
 AC_CHECK_FUNCS(strtoll)
 
 #
+AC_CHECK_SIZEOF([size_t])
+
+if test "$ac_cv_sizeof_size_t" = 4; then
+	FLAVOR=32
+else
+	FLAVOR=64
+fi
+
+#
 # Globus Setup
 #
 
@@ -109,16 +118,21 @@ AC_ARG_WITH(globus,
 
 if test "x$globus_location" == "x/usr" ; then
 	# RPM installation
-	CPPFLAGS=-I$globus_location/lib64/globus/include
+	if test "$FLAVOR" = "32"; then
+		CPPFLAGS=-I$globus_location/lib/globus/include
+	else
+		CPPFLAGS=-I$globus_location/lib64/globus/include
+	fi
+
 	AC_CHECK_HEADERS([globus_config.h],
 	                 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"], 
-	                 [AC_MSG_ERROR(globus_config.h not found, install globus-core)])
+	                 [AC_MSG_ERROR([globus_config.h not found, install globus-core])])
 else
 	# Source installation
-	CPPFLAGS=-I$globus_location/include/globus/gcc64dbg
+	CPPFLAGS=-I$globus_location/include/globus/gcc${FLAVOR}dbg
 	AC_CHECK_HEADERS([globus_config.h],
 	                 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"], 
-	                 [AC_MSG_ERROR(globus_config.h not found in $globus_location)])
+	                 [AC_MSG_ERROR([globus_config.h not found in $globus_location])])
 fi
 
 #
@@ -127,23 +141,27 @@ fi
 CPPFLAGS="-I/$globus_location/include/globus $GLOBUS_CONFIG_CPPFLAGS"
 AC_CHECK_HEADERS([globus_common.h], 
                  [GLOBUS_COMMON_CPPFLAGS="-I/$globus_location/include/globus"], 
-                 [AC_MSG_ERROR(globus_common.h not found)])
+                 [AC_MSG_ERROR([globus_common.h not found])])
 
 CPPFLAGS="$GLOBUS_CONFIG_CPPFLAGS $GLOBUS_COMMON_CPPFLAGS"
 
 #
 # Find the needed Globus libraries
 #
-LDFLAGS="-L$globus_location/lib64/"
+if test "$FLAVOR" = "32"; then
+	LDFLAGS="-L$globus_location/lib/"
+else
+	LDFLAGS="-L$globus_location/lib64/"
+fi
 AC_CHECK_LIB([globus_common],
              [globus_module_activate], 
              [], 
-             [AC_MSG_ERROR(libglobus_common.so not found)])
+             [AC_MSG_ERROR([libglobus_common.so not found])])
 
 AC_CHECK_LIB([globus_gssapi_gsi], 
              [gss_wrap], 
              [], 
-             [AC_MSG_ERROR(libglobus_gssapi_gsi.so not found)])
+             [AC_MSG_ERROR([libglobus_gssapi_gsi.so not found])])
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
