@@ -3290,25 +3290,11 @@ _f_setup_pasv(fh_t * fh, fh_t * ofh, int retrieve)
 	{
 		ec = _f_send_cmd(fh, fh->pasvCmd);
 		if (ec)
-		{
-			if (strcmp(fh->pasvCmd,"PASV") != 0)
-			{
-				fh->pasvCmd = "PASV";
-				continue;
-			}
-			else return ec;
-		}
+			return ec;
 
 		ec = _f_get_final_resp(fh, &code, &resp);
 		if (ec)
-		{
-			if (strcmp(fh->pasvCmd,"PASV") != 0)
-			{
-				fh->pasvCmd = "PASV";
-				continue;
-			}
-			else return ec;
-		}
+			return ec;
 
 		if (F_CODE_INTR(code) || F_CODE_ERR(code))
 		{
