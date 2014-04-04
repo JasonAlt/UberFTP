@@ -42,7 +42,7 @@ dnl
 dnl Process this file with autoconf to produce a configure script.
 # First [] is used as the prompt
 # Last [] is used for the version information
-AC_INIT(UberFTP (2.8), [2.8], [Jason Alt <jalt@ncsa.illinois.edu>],[uberftp-client])
+AC_INIT(UberFTP (2.9 Beta), [2.9 Beta], [Jason Alt <jalt@ncsa.illinois.edu>],[uberftp-client])
 AM_INIT_AUTOMAKE 
 
 # Check for an MSSFTP build

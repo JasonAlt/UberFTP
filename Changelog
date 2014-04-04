@@ -1,3 +1,7 @@
+Version 2.9 Beta 4/4/14
+	- Build fixed for 32bit
+	- Added IPv6 support provided by Francesco Prelz of INFN Milan
+
 Version 2.8 2/10/14
 	- Fixed SPOR response during striped third party transfers. SPOR will
 	  pass all addresses returned from SPAS.
