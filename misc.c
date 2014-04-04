@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2003-2012 NCSA.  All rights reserved.
+ * Copyright © 2003-2014 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -38,21 +38,19 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <netdb.h>
 #include <ctype.h>
 #include <time.h>
-
-      #include <sys/socket.h>
-       #include <netinet/in.h>
-       #include <arpa/inet.h>
-
-#include <netdb.h>
 
 #include "config.h"
 #include "misc.h"
