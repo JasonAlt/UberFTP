@@ -3974,6 +3974,7 @@ _f_readdir_mlsd(pd_t * pd, char * path, ml_t *** mlp, char * token)
 	char * listing = NULL;
 	char * rec     = NULL;
 	char * eor     = NULL;
+	char * eol     = NULL;
 	char * name    = NULL;
 	char * cmd     = NULL;
 	errcode_t ec   = EC_SUCCESS;
@@ -4011,16 +4012,14 @@ _f_readdir_mlsd(pd_t * pd, char * path, ml_t *** mlp, char * token)
 	o_printf(DEBUG_VERBOSE, "MLSD output:\n");
 	o_printf(DEBUG_VERBOSE, "%s", listing);
 
-	for (rec = listing; ec == EC_SUCCESS && rec && *rec; rec = eor + 2)
-	{
-		eor = strstr(rec, "\r\n");
-		if (eor)
-			*eor = '\0';
+	for (rec = listing; rec < eol; rec = eor+2)
+        {
+		eor  = strstr(rec, "\r\n");
+		*eor = '\0';
+		name = strstr(rec, "; ") + 2;
 
-		if (eor)
-			name = strstr(rec, "; ");
-
-		if (token && name)
+		// For regular expressions, determine if we should skip this entry
+		if (token)
 		{
 			/* Regular expression match. */
 			if (s_glob() && fnmatch(token, name, 0))
@@ -4031,30 +4030,21 @@ _f_readdir_mlsd(pd_t * pd, char * path, ml_t *** mlp, char * token)
 				continue;
 		}
 
-		if (eor && name)
-		{
-			*mlp = (ml_t**) realloc(*mlp, (index+2)*sizeof(ml_t*));
-			(*mlp)[index]   = (ml_t *) malloc(sizeof(ml_t));
-			(*mlp)[index+1] = NULL;
+		*mlp = (ml_t**) realloc(*mlp, (index+2)*sizeof(ml_t*));
+		(*mlp)[index]   = (ml_t *) malloc(sizeof(ml_t));
+		(*mlp)[index+1] = NULL;
 
-			_f_mlsx(rec, (*mlp)[index]);
+		_f_mlsx(rec, (*mlp)[index]);
 
-			/* Allow '.' and '..' to the upper layer. */
-			if (eor && Strcasestr(rec, "type=cdir"))
-				(*mlp)[index]->name = Strdup(".");
-			else if (eor && Strcasestr(rec, "type=pdir"))
-				(*mlp)[index]->name = Strdup("..");
-			else
-				(*mlp)[index]->name = Strdup(name + 2);
+		/* Allow '.' and '..' to the upper layer. */
+		if (eor && Strcasestr(rec, "type=cdir"))
+			(*mlp)[index]->name = Strdup(".");
+		else if (eor && Strcasestr(rec, "type=pdir"))
+        		(*mlp)[index]->name = Strdup("..");
+		else
+        		(*mlp)[index]->name = Strdup(name);
 
-			index++;
-		}
-
-		if (!eor || !name)
-			ec = ec_create(EC_GSI_SUCCESS,
-			               EC_GSI_SUCCESS,
-			               "Bad server response:\n %s",
-			               rec);
+		index++;
 	}
 
 cleanup:
